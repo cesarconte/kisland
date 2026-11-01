@@ -12,6 +12,7 @@
 #include <QFile>
 #include <QQmlComponent>
 #include <QQmlEngine>
+#include <QRegularExpression>
 #include <QTest>
 
 class TestKIsland : public QObject
@@ -109,6 +110,86 @@ private Q_SLOTS:
                 QVERIFY(!title.isEmpty());
             }
         }
+    }
+
+    void testWpctlStatusAndPrivacyParsing()
+    {
+        const QString sampleWpctl = QStringLiteral(
+            "Audio\n"
+            " ├─ Sinks:\n"
+            " │      52. Audio Interno Estéreo digital (IEC958) [vol: 0.40]\n"
+            " │  *  211. SRS-XB13                            [vol: 0.65]\n"
+            " └─ Streams:\n"
+            "       160. cava\n"
+            "            116. input_FL        < SRS-XB13:monitor_FL\t[active]\n"
+            "       280. Firefox\n"
+            "            119. input_FL        < Easy Effects Source:capture_FL\t[active]\n"
+            "Video\n"
+            " └─ Streams:\n"
+            "       301. obs\n"
+            "            302. input_1         < kwin_wayland:output_1\t[active]\n");
+
+        static const QRegularExpression sinkLineRe(QStringLiteral(R"(^\s*│?\s*\*\s*\d+\.\s+(.+?)\s+\[vol:\s*([0-9.]+)(\s+MUTED)?\])"));
+        static const QRegularExpression streamHeaderRe(QStringLiteral(R"(^\s*\d+\.\s+([A-Za-z0-9_. -]+?)\s*$)"));
+
+        QString deviceName;
+        int volPercent = 0;
+        bool micActive = false;
+        QString micApp;
+        bool camActive = false;
+        QString camApp;
+
+        QString section;
+        QString subSection;
+        QString currentClient;
+        for (const QString &rawLine : sampleWpctl.split(QLatin1Char('\n'))) {
+            const QString trimmed = rawLine.trimmed();
+            if (trimmed == QStringLiteral("Audio") || trimmed == QStringLiteral("Video")) {
+                section = trimmed;
+                subSection.clear();
+                continue;
+            }
+            if (trimmed.contains(QStringLiteral("Sinks:"))) {
+                subSection = QStringLiteral("Sinks");
+                continue;
+            }
+            if (trimmed.contains(QStringLiteral("Streams:"))) {
+                subSection = QStringLiteral("Streams");
+                currentClient.clear();
+                continue;
+            }
+            if (section == QStringLiteral("Audio") && subSection == QStringLiteral("Sinks")) {
+                const auto m = sinkLineRe.match(rawLine);
+                if (m.hasMatch()) {
+                    deviceName = m.captured(1).trimmed();
+                    volPercent = qRound(m.captured(2).toDouble() * 100.0);
+                }
+            } else if (section == QStringLiteral("Audio") && subSection == QStringLiteral("Streams")) {
+                const auto hm = streamHeaderRe.match(rawLine);
+                if (hm.hasMatch() && !rawLine.contains(QLatin1Char('<'))) {
+                    currentClient = hm.captured(1).trimmed();
+                } else if (rawLine.contains(QLatin1Char('<')) && rawLine.contains(QStringLiteral("[active]"))
+                           && rawLine.contains(QStringLiteral(":capture_"))) {
+                    micActive = true;
+                    micApp = currentClient;
+                }
+            } else if (section == QStringLiteral("Video") && subSection == QStringLiteral("Streams")) {
+                const auto hm = streamHeaderRe.match(rawLine);
+                if (hm.hasMatch() && !rawLine.contains(QLatin1Char('<'))) {
+                    currentClient = hm.captured(1).trimmed();
+                } else if (rawLine.contains(QStringLiteral("[active]"))) {
+                    camActive = true;
+                    camApp = currentClient;
+                }
+            }
+        }
+
+        QCOMPARE(deviceName, QStringLiteral("SRS-XB13"));
+        QCOMPARE(volPercent, 65);
+        QVERIFY(micActive);
+        QCOMPARE(micApp, QStringLiteral("Firefox"));
+        QVERIFY(camActive);
+        QCOMPARE(camApp, QStringLiteral("obs"));
     }
 };
 

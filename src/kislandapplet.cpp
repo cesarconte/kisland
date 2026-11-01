@@ -15,11 +15,13 @@
 #include <QDBusConnectionInterface>
 #include <QDBusInterface>
 #include <QDBusMessage>
+#include <QDBusObjectPath>
 #include <QDBusReply>
 #include <QDBusVariant>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QRegularExpression>
 #include <QStandardPaths>
 #include <QUrl>
 
@@ -56,13 +58,51 @@ QString KIslandApplet::trackAlbum() const { return m_trackAlbum; }
 QString KIslandApplet::trackArtUrl() const { return m_trackArtUrl; }
 bool KIslandApplet::isVideoMedia() const { return m_isVideoMedia; }
 QString KIslandApplet::playerName() const { return m_playerName; }
+qint64 KIslandApplet::trackPositionSecs() const { return m_trackPositionSecs; }
+qint64 KIslandApplet::trackDurationSecs() const { return m_trackDurationSecs; }
+QString KIslandApplet::trackElapsedText() const { return formatCountdown(m_trackPositionSecs); }
+QString KIslandApplet::trackRemainingText() const
+{
+    if (m_trackDurationSecs <= 0) {
+        return QStringLiteral("--:--");
+    }
+    const qint64 rem = qMax<qint64>(0, m_trackDurationSecs - m_trackPositionSecs);
+    return QStringLiteral("-") + formatCountdown(rem);
+}
+double KIslandApplet::trackProgress() const
+{
+    if (m_trackDurationSecs <= 0) {
+        return 0.0;
+    }
+    return qBound(0.0, static_cast<double>(m_trackPositionSecs) / static_cast<double>(m_trackDurationSecs), 1.0);
+}
+bool KIslandApplet::shuffleEnabled() const { return m_shuffleEnabled; }
+QString KIslandApplet::loopStatus() const { return m_loopStatus; }
 QVariantList KIslandApplet::spectrumBars() const { return m_spectrumBars; }
 bool KIslandApplet::timerActive() const { return m_timerActive; }
+bool KIslandApplet::timerPaused() const { return m_timerPaused; }
+double KIslandApplet::timerProgress() const
+{
+    if (!m_timerActive || m_timerTotalSecs <= 0) {
+        return 0.0;
+    }
+    const qint64 rem = m_timerPaused
+        ? m_timerPausedRemainingSecs
+        : qMax<qint64>(0, QDateTime::currentDateTime().secsTo(m_timerTarget));
+    return qBound(0.0, static_cast<double>(rem) / static_cast<double>(m_timerTotalSecs), 1.0);
+}
 QString KIslandApplet::timerRemainingText() const { return m_timerRemainingText; }
 QString KIslandApplet::timerLabel() const { return m_timerLabel; }
 QString KIslandApplet::kiriState() const { return m_kiriState; }
 int KIslandApplet::cpuUsagePercent() const { return m_cpuUsagePercent; }
 int KIslandApplet::ramUsagePercent() const { return m_ramUsagePercent; }
+int KIslandApplet::outputVolumePercent() const { return m_outputVolumePercent; }
+bool KIslandApplet::outputMuted() const { return m_outputMuted; }
+QString KIslandApplet::outputDeviceName() const { return m_outputDeviceName; }
+bool KIslandApplet::micActive() const { return m_micActive; }
+QString KIslandApplet::micApp() const { return m_micApp; }
+bool KIslandApplet::cameraOrScreenActive() const { return m_cameraOrScreenActive; }
+QString KIslandApplet::cameraOrScreenApp() const { return m_cameraOrScreenApp; }
 
 QVariantList KIslandApplet::computeSpectrumBarsFromPcm(const QByteArray &pcmChunk, int barCount)
 {
@@ -243,6 +283,97 @@ QString KIslandApplet::resolveCoverArtOrVideoThumbnail(const QString &artUrl, co
     return QString();
 }
 
+QVariantMap KIslandApplet::parseWpctlStatus(const QString &wpctlOutput, const QString &kiriState)
+{
+    QVariantMap res;
+    int volumePercent = 40;
+    bool muted = false;
+    QString deviceName = QStringLiteral("PipeWire");
+    bool micInUse = (kiriState == QStringLiteral("listening"));
+    QString micAppName = micInUse ? QStringLiteral("Kiri") : QString();
+    bool camInUse = false;
+    QString camAppName;
+
+    const QStringList lines = wpctlOutput.split(QLatin1Char('\n'));
+    QString section;
+    QString subSection;
+    QString currentStreamClient;
+
+    static const QRegularExpression sinkLineRe(QStringLiteral(R"(^\s*│?\s*\*\s*\d+\.\s+(.+?)\s+\[vol:\s*([0-9.]+)(\s+MUTED)?\])"));
+    static const QRegularExpression streamHeaderRe(QStringLiteral(R"(^\s*\d+\.\s+([A-Za-z0-9_. -]+?)\s*$)"));
+
+    for (const QString &rawLine : lines) {
+        const QString trimmed = rawLine.trimmed();
+        if (trimmed == QStringLiteral("Audio")) {
+            section = QStringLiteral("Audio");
+            subSection.clear();
+            continue;
+        } else if (trimmed == QStringLiteral("Video")) {
+            section = QStringLiteral("Video");
+            subSection.clear();
+            continue;
+        } else if (trimmed == QStringLiteral("Settings")) {
+            section = QStringLiteral("Settings");
+            subSection.clear();
+            continue;
+        }
+
+        if (trimmed.contains(QStringLiteral("├─ Sinks:")) || trimmed.contains(QStringLiteral("└─ Sinks:"))) {
+            subSection = QStringLiteral("Sinks");
+            continue;
+        } else if (trimmed.contains(QStringLiteral("├─ Sources:")) || trimmed.contains(QStringLiteral("└─ Sources:"))) {
+            subSection = QStringLiteral("Sources");
+            continue;
+        } else if (trimmed.contains(QStringLiteral("├─ Filters:")) || trimmed.contains(QStringLiteral("└─ Filters:"))) {
+            subSection = QStringLiteral("Filters");
+            continue;
+        } else if (trimmed.contains(QStringLiteral("├─ Streams:")) || trimmed.contains(QStringLiteral("└─ Streams:"))) {
+            subSection = QStringLiteral("Streams");
+            currentStreamClient.clear();
+            continue;
+        }
+
+        if (section == QStringLiteral("Audio") && subSection == QStringLiteral("Sinks")) {
+            const QRegularExpressionMatch m = sinkLineRe.match(rawLine);
+            if (m.hasMatch()) {
+                deviceName = m.captured(1).trimmed();
+                const double vol = m.captured(2).toDouble();
+                volumePercent = qBound(0, qRound(vol * 100.0), 150);
+                muted = !m.captured(3).isEmpty();
+            }
+        } else if (section == QStringLiteral("Audio") && subSection == QStringLiteral("Streams")) {
+            const QRegularExpressionMatch hm = streamHeaderRe.match(rawLine);
+            if (hm.hasMatch() && !rawLine.contains(QLatin1Char('<')) && !rawLine.contains(QLatin1Char('>'))) {
+                currentStreamClient = hm.captured(1).trimmed();
+            } else if (rawLine.contains(QLatin1Char('<')) && rawLine.contains(QStringLiteral("[active]"))
+                       && rawLine.contains(QStringLiteral(":capture_"))) {
+                if (!currentStreamClient.isEmpty()
+                    && !(currentStreamClient == QStringLiteral("pw-record") && kiriState != QStringLiteral("listening"))) {
+                    micInUse = true;
+                    micAppName = currentStreamClient;
+                }
+            }
+        } else if (section == QStringLiteral("Video") && subSection == QStringLiteral("Streams")) {
+            const QRegularExpressionMatch hm = streamHeaderRe.match(rawLine);
+            if (hm.hasMatch() && !rawLine.contains(QLatin1Char('<')) && !rawLine.contains(QLatin1Char('>'))) {
+                currentStreamClient = hm.captured(1).trimmed();
+            } else if (rawLine.contains(QStringLiteral("[active]"))) {
+                camInUse = true;
+                camAppName = currentStreamClient.isEmpty() ? QStringLiteral("Vídeo / Pantalla") : currentStreamClient;
+            }
+        }
+    }
+
+    res[QStringLiteral("volumePercent")] = volumePercent;
+    res[QStringLiteral("muted")] = muted;
+    res[QStringLiteral("deviceName")] = deviceName;
+    res[QStringLiteral("micActive")] = micInUse;
+    res[QStringLiteral("micApp")] = micAppName;
+    res[QStringLiteral("cameraOrScreenActive")] = camInUse;
+    res[QStringLiteral("cameraOrScreenApp")] = camAppName;
+    return res;
+}
+
 void KIslandApplet::pollMprisAndActivities()
 {
     updateSystemVitals();
@@ -264,6 +395,8 @@ void KIslandApplet::pollMprisAndActivities()
         Q_EMIT kiriStateChanged();
     }
 
+    updatePipeWireAudioAndPrivacy();
+
     // 2. Discover MPRIS2 Media Players (D-Bus Properties.Get + playerctl fallback)
     bool foundPlaying = false;
     QString newTitle;
@@ -272,7 +405,12 @@ void KIslandApplet::pollMprisAndActivities()
     QString newRawArtUrl;
     QString newMediaUrl;
     QString newPlayer;
+    QString newObjectId;
     QString chosenService;
+    qint64 newPosSecs = 0;
+    qint64 newDurSecs = 0;
+    bool newShuffle = false;
+    QString newLoop = QStringLiteral("None");
 
     if (auto *busIface = QDBusConnection::sessionBus().interface()) {
         const QStringList services = busIface->registeredServiceNames().value();
@@ -312,6 +450,16 @@ void KIslandApplet::pollMprisAndActivities()
             const QString album = meta.value(QStringLiteral("xesam:album")).toString().trimmed();
             const QString cleanPlayerName = srv.mid(23).section(QLatin1Char('.'), 0, 0);
 
+            const qint64 posMicros = props.value(QStringLiteral("Position")).toLongLong();
+            const qint64 lenMicros = meta.value(QStringLiteral("mpris:length")).toLongLong();
+            QString trackObjPath;
+            const QVariant trackIdVar = meta.value(QStringLiteral("mpris:trackid"));
+            if (trackIdVar.userType() == qMetaTypeId<QDBusObjectPath>()) {
+                trackObjPath = trackIdVar.value<QDBusObjectPath>().path();
+            } else {
+                trackObjPath = trackIdVar.toString();
+            }
+
             const bool isPlayingNow = (status.compare(QStringLiteral("Playing"), Qt::CaseInsensitive) == 0);
             if (isPlayingNow || (chosenService.isEmpty() && !title.isEmpty())) {
                 chosenService = srv;
@@ -322,6 +470,12 @@ void KIslandApplet::pollMprisAndActivities()
                 newRawArtUrl = artUrlStr;
                 newMediaUrl = urlStr;
                 newPlayer = cleanPlayerName;
+                newObjectId = trackObjPath;
+                newPosSecs = qMax<qint64>(0, posMicros / 1000000LL);
+                newDurSecs = qMax<qint64>(0, lenMicros / 1000000LL);
+                newShuffle = props.value(QStringLiteral("Shuffle")).toBool();
+                const QString lp = props.value(QStringLiteral("LoopStatus")).toString().trimmed();
+                newLoop = lp.isEmpty() ? QStringLiteral("None") : lp;
                 if (foundPlaying) {
                     break;
                 }
@@ -365,15 +519,22 @@ void KIslandApplet::pollMprisAndActivities()
 
     const bool changed = (m_mediaPlaying != foundPlaying || m_trackTitle != newTitle
                           || m_trackArtist != newArtist || m_playerName != newPlayer
-                          || m_trackArtUrl != resolvedArt || m_isVideoMedia != detectedIsVideo);
+                          || m_trackArtUrl != resolvedArt || m_isVideoMedia != detectedIsVideo
+                          || m_trackPositionSecs != newPosSecs || m_trackDurationSecs != newDurSecs
+                          || m_shuffleEnabled != newShuffle || m_loopStatus != newLoop);
     m_mediaPlaying = foundPlaying;
     m_trackTitle = newTitle;
     m_trackArtist = newArtist;
     m_trackAlbum = newAlbum;
     m_trackArtUrl = resolvedArt;
+    m_trackObjectId = newObjectId;
     m_isVideoMedia = detectedIsVideo;
     m_playerName = newPlayer;
     m_activeMprisService = chosenService;
+    m_trackPositionSecs = newPosSecs;
+    m_trackDurationSecs = newDurSecs;
+    m_shuffleEnabled = newShuffle;
+    m_loopStatus = newLoop;
 
     if (m_mediaPlaying) {
         startPipeWireSpectrumMonitor();
@@ -470,9 +631,102 @@ void KIslandApplet::previousTrack()
     QTimer::singleShot(350, this, &KIslandApplet::pollMprisAndActivities);
 }
 
+void KIslandApplet::seekToRatio(double ratio)
+{
+    if (m_activeMprisService.isEmpty() || m_trackDurationSecs <= 0) return;
+    const double clamped = qBound(0.0, ratio, 1.0);
+    const qint64 targetSecs = qRound64(clamped * static_cast<double>(m_trackDurationSecs));
+    const qint64 targetMicros = targetSecs * 1000000LL;
+
+    if (!m_trackObjectId.isEmpty()) {
+        QDBusMessage msg = QDBusMessage::createMethodCall(
+            m_activeMprisService,
+            QStringLiteral("/org/mpris/MediaPlayer2"),
+            QStringLiteral("org.mpris.MediaPlayer2.Player"),
+            QStringLiteral("SetPosition"));
+        msg << QVariant::fromValue(QDBusObjectPath(m_trackObjectId)) << targetMicros;
+        QDBusConnection::sessionBus().asyncCall(msg);
+    } else {
+        const qint64 offsetMicros = (targetSecs - m_trackPositionSecs) * 1000000LL;
+        QDBusInterface iface(m_activeMprisService,
+                             QStringLiteral("/org/mpris/MediaPlayer2"),
+                             QStringLiteral("org.mpris.MediaPlayer2.Player"),
+                             QDBusConnection::sessionBus());
+        iface.asyncCall(QStringLiteral("Seek"), offsetMicros);
+    }
+
+    m_trackPositionSecs = targetSecs;
+    Q_EMIT mediaStateChanged();
+    QTimer::singleShot(250, this, &KIslandApplet::pollMprisAndActivities);
+}
+
+void KIslandApplet::skipBySeconds(int deltaSeconds)
+{
+    if (m_activeMprisService.isEmpty()) return;
+    const qint64 offsetMicros = static_cast<qint64>(deltaSeconds) * 1000000LL;
+    QDBusInterface iface(m_activeMprisService,
+                         QStringLiteral("/org/mpris/MediaPlayer2"),
+                         QStringLiteral("org.mpris.MediaPlayer2.Player"),
+                         QDBusConnection::sessionBus());
+    iface.asyncCall(QStringLiteral("Seek"), offsetMicros);
+    QTimer::singleShot(250, this, &KIslandApplet::pollMprisAndActivities);
+}
+
+void KIslandApplet::toggleShuffle()
+{
+    if (m_activeMprisService.isEmpty()) return;
+    const bool nextState = !m_shuffleEnabled;
+    QDBusMessage msg = QDBusMessage::createMethodCall(
+        m_activeMprisService,
+        QStringLiteral("/org/mpris/MediaPlayer2"),
+        QStringLiteral("org.freedesktop.DBus.Properties"),
+        QStringLiteral("Set"));
+    msg << QStringLiteral("org.mpris.MediaPlayer2.Player")
+        << QStringLiteral("Shuffle")
+        << QVariant::fromValue(QDBusVariant(nextState));
+    QDBusConnection::sessionBus().asyncCall(msg);
+    m_shuffleEnabled = nextState;
+    Q_EMIT mediaStateChanged();
+}
+
+void KIslandApplet::cycleLoopStatus()
+{
+    if (m_activeMprisService.isEmpty()) return;
+    QString nextLoop = QStringLiteral("None");
+    if (m_loopStatus == QStringLiteral("None")) {
+        nextLoop = QStringLiteral("Playlist");
+    } else if (m_loopStatus == QStringLiteral("Playlist")) {
+        nextLoop = QStringLiteral("Track");
+    }
+    QDBusMessage msg = QDBusMessage::createMethodCall(
+        m_activeMprisService,
+        QStringLiteral("/org/mpris/MediaPlayer2"),
+        QStringLiteral("org.freedesktop.DBus.Properties"),
+        QStringLiteral("Set"));
+    msg << QStringLiteral("org.mpris.MediaPlayer2.Player")
+        << QStringLiteral("LoopStatus")
+        << QVariant::fromValue(QDBusVariant(nextLoop));
+    QDBusConnection::sessionBus().asyncCall(msg);
+    m_loopStatus = nextLoop;
+    Q_EMIT mediaStateChanged();
+}
+
+void KIslandApplet::raiseMediaPlayer()
+{
+    if (m_activeMprisService.isEmpty()) return;
+    QDBusInterface iface(m_activeMprisService,
+                         QStringLiteral("/org/mpris/MediaPlayer2"),
+                         QStringLiteral("org.mpris.MediaPlayer2"),
+                         QDBusConnection::sessionBus());
+    iface.asyncCall(QStringLiteral("Raise"));
+}
+
 void KIslandApplet::startQuickTimer(int durationSeconds, const QString &label)
 {
     if (durationSeconds <= 0) return;
+    m_timerTotalSecs = durationSeconds;
+    m_timerPausedRemainingSecs = durationSeconds;
+    m_timerPaused = false;
     m_timerTarget = QDateTime::currentDateTime().addSecs(durationSeconds);
     m_timerLabel = label;
     m_timerActive = true;
@@ -481,17 +735,35 @@ void KIslandApplet::startQuickTimer(int durationSeconds, const QString &label)
     Q_EMIT timerChanged();
 }
 
+void KIslandApplet::togglePauseTimer()
+{
+    if (!m_timerActive) return;
+    if (!m_timerPaused) {
+        m_timerPausedRemainingSecs = qMax<qint64>(1, QDateTime::currentDateTime().secsTo(m_timerTarget));
+        m_timerPaused = true;
+        m_countdownTimer->stop();
+    } else {
+        m_timerTarget = QDateTime::currentDateTime().addSecs(m_timerPausedRemainingSecs);
+        m_timerPaused = false;
+        m_countdownTimer->start(1000);
+    }
+    Q_EMIT timerChanged();
+}
+
 void KIslandApplet::cancelQuickTimer()
 {
     m_countdownTimer->stop();
     m_timerActive = false;
+    m_timerPaused = false;
+    m_timerTotalSecs = 0;
+    m_timerPausedRemainingSecs = 0;
     m_timerRemainingText.clear();
     Q_EMIT timerChanged();
 }
 
 void KIslandApplet::onTimerTick()
 {
-    if (!m_timerActive) return;
+    if (!m_timerActive || m_timerPaused) return;
     const qint64 rem = QDateTime::currentDateTime().secsTo(m_timerTarget);
     if (rem <= 0) {
         cancelQuickTimer();
@@ -508,6 +780,86 @@ void KIslandApplet::invokeKiriVoice()
                          QString(),
                          QDBusConnection::sessionBus());
     iface.asyncCall(QStringLiteral("toggleRecording"));
+}
+
+void KIslandApplet::setOutputVolume(int percent)
+{
+    const int clamped = qBound(0, percent, 150);
+    const QString wpctl = QStandardPaths::findExecutable(QStringLiteral("wpctl"));
+    if (!wpctl.isEmpty()) {
+        const QString ratioStr = QString::number(clamped / 100.0, 'f', 2);
+        QProcess::startDetached(wpctl, {QStringLiteral("set-volume"), QStringLiteral("@DEFAULT_AUDIO_SINK@"), ratioStr});
+    }
+    if (m_outputVolumePercent != clamped) {
+        m_outputVolumePercent = clamped;
+        Q_EMIT audioChanged();
+    }
+}
+
+void KIslandApplet::toggleOutputMute()
+{
+    const QString wpctl = QStandardPaths::findExecutable(QStringLiteral("wpctl"));
+    if (!wpctl.isEmpty()) {
+        QProcess::startDetached(wpctl, {QStringLiteral("set-mute"), QStringLiteral("@DEFAULT_AUDIO_SINK@"), QStringLiteral("toggle")});
+    }
+    m_outputMuted = !m_outputMuted;
+    Q_EMIT audioChanged();
+}
+
+void KIslandApplet::launchDropover()
+{
+    const QString bin = QStandardPaths::findExecutable(QStringLiteral("kdropover"),
+                                                       {QDir::homePath() + QStringLiteral("/.local/bin"), QStringLiteral("/usr/local/bin"), QStringLiteral("/usr/bin")});
+    if (!bin.isEmpty()) {
+        QProcess::startDetached(bin, {});
+    }
+}
+
+void KIslandApplet::launchLiveCaptions()
+{
+    const QString bin = QStandardPaths::findExecutable(QStringLiteral("klivecaptions"),
+                                                       {QDir::homePath() + QStringLiteral("/.local/bin"), QStringLiteral("/usr/local/bin"), QStringLiteral("/usr/bin")});
+    if (!bin.isEmpty()) {
+        QProcess::startDetached(bin, {});
+    }
+}
+
+void KIslandApplet::updatePipeWireAudioAndPrivacy()
+{
+    const QString wpctl = QStandardPaths::findExecutable(QStringLiteral("wpctl"));
+    if (wpctl.isEmpty()) return;
+
+    QProcess proc;
+    proc.start(wpctl, {QStringLiteral("status")});
+    if (!proc.waitForFinished(450) || proc.exitCode() != 0) {
+        return;
+    }
+
+    const QVariantMap parsed = parseWpctlStatus(QString::fromUtf8(proc.readAllStandardOutput()), m_kiriState);
+    const int newVol = parsed.value(QStringLiteral("volumePercent"), m_outputVolumePercent).toInt();
+    const bool newMuted = parsed.value(QStringLiteral("muted"), m_outputMuted).toBool();
+    const QString newDev = parsed.value(QStringLiteral("deviceName"), m_outputDeviceName).toString();
+
+    if (m_outputVolumePercent != newVol || m_outputMuted != newMuted || m_outputDeviceName != newDev) {
+        m_outputVolumePercent = newVol;
+        m_outputMuted = newMuted;
+        m_outputDeviceName = newDev;
+        Q_EMIT audioChanged();
+    }
+
+    const bool newMic = parsed.value(QStringLiteral("micActive")).toBool();
+    const QString newMicApp = parsed.value(QStringLiteral("micApp")).toString();
+    const bool newCam = parsed.value(QStringLiteral("cameraOrScreenActive")).toBool();
+    const QString newCamApp = parsed.value(QStringLiteral("cameraOrScreenApp")).toString();
+
+    if (m_micActive != newMic || m_micApp != newMicApp
+        || m_cameraOrScreenActive != newCam || m_cameraOrScreenApp != newCamApp) {
+        m_micActive = newMic;
+        m_micApp = newMicApp;
+        m_cameraOrScreenActive = newCam;
+        m_cameraOrScreenApp = newCamApp;
+        Q_EMIT privacyChanged();
+    }
 }
 
 void KIslandApplet::updateSystemVitals()
