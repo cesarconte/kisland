@@ -1,6 +1,17 @@
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 add_definitions(-DTRANSLATION_DOMAIN=\"plasma_applet_org.cesar.kisland\")
 
+# Reusable, unit-testable modules (notification digest, song recognition)
+add_library(kisland_modules STATIC
+    notificationdigest.cpp
+    notificationdigest.h
+    songrecognizer.cpp
+    songrecognizer.h
+)
+set_target_properties(kisland_modules PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(kisland_modules PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(kisland_modules PUBLIC Qt6::Core Qt6::Gui Qt6::Network)
+
 plasma_add_applet(org.cesar.kisland
     CPP_SOURCES
         kislandapplet.cpp
@@ -13,9 +24,11 @@ plasma_add_applet(org.cesar.kisland
 target_include_directories(org.cesar.kisland PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_link_libraries(org.cesar.kisland PRIVATE
+    kisland_modules
     Qt6::Core
     Qt6::DBus
     Qt6::Gui
+    Qt6::Network
     Qt6::Quick
     KF6::ConfigCore
     KF6::CoreAddons
@@ -23,3 +36,5 @@ target_link_libraries(org.cesar.kisland PRIVATE
     Plasma::Plasma
     Plasma::PlasmaQuick
 )
+
+install(PROGRAMS ${CMAKE_SOURCE_DIR}/scripts/shazam_recognize.py DESTINATION ${KDE_INSTALL_DATADIR}/kisland)

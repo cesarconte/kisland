@@ -5,6 +5,9 @@
 
 #include "kislandapplet.h"
 
+#include "notificationdigest.h"
+#include "songrecognizer.h"
+
 #include <cmath>
 
 #include <KPluginFactory>
@@ -32,6 +35,8 @@ KIslandApplet::KIslandApplet(QObject *parent, const KPluginMetaData &data, const
     , m_pollTimer(new QTimer(this))
     , m_countdownTimer(new QTimer(this))
 {
+    m_digest = new NotificationDigest(this);
+    m_songRecognizer = new SongRecognizer(this);
 }
 
 KIslandApplet::~KIslandApplet()
@@ -47,6 +52,8 @@ void KIslandApplet::init()
     m_pollTimer->start(1800);
 
     connect(m_countdownTimer, &QTimer::timeout, this, &KIslandApplet::onTimerTick);
+
+    m_digest->start();
 
     pollMprisAndActivities();
 }
@@ -99,6 +106,8 @@ int KIslandApplet::ramUsagePercent() const { return m_ramUsagePercent; }
 int KIslandApplet::outputVolumePercent() const { return m_outputVolumePercent; }
 bool KIslandApplet::outputMuted() const { return m_outputMuted; }
 QString KIslandApplet::outputDeviceName() const { return m_outputDeviceName; }
+QObject *KIslandApplet::notificationDigest() const { return m_digest; }
+QObject *KIslandApplet::songRecognizer() const { return m_songRecognizer; }
 bool KIslandApplet::micActive() const { return m_micActive; }
 QString KIslandApplet::micApp() const { return m_micApp; }
 bool KIslandApplet::cameraOrScreenActive() const { return m_cameraOrScreenActive; }

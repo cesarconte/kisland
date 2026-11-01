@@ -3,6 +3,7 @@ find_package(Qt6Test ${QT_MIN_VERSION} REQUIRED)
 add_executable(test_kisland test_kisland.cpp)
 target_compile_definitions(test_kisland PRIVATE KISLAND_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 target_link_libraries(test_kisland PRIVATE
+    kisland_modules
     Qt6::Core
     Qt6::DBus
     Qt6::Gui

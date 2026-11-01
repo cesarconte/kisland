@@ -581,7 +581,165 @@ PlasmoidItem {
                 }
             }
 
-            // 3. Live Activity Timer Card with Progress Bar & Pause/Resume
+            // 3. Music Recognition (macOS Shazam integration) — listens to the PipeWire default sink
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: songRow.implicitHeight + Kirigami.Units.mediumSpacing * 2
+                Layout.preferredHeight: implicitHeight
+                radius: Kirigami.Units.mediumSpacing
+                color: Qt.rgba(0.02, 0.03, 0.05, 0.42)
+                border.width: 1
+                border.color: Plasmoid.songRecognizer.listening ? "#00e5ff" : Qt.rgba(1.0, 1.0, 1.0, 0.15)
+
+                RowLayout {
+                    id: songRow
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.leftMargin: Kirigami.Units.mediumSpacing
+                    anchors.rightMargin: Kirigami.Units.mediumSpacing
+                    spacing: Kirigami.Units.mediumSpacing
+
+                    Rectangle {
+                        implicitWidth: 44
+                        implicitHeight: 44
+                        Layout.preferredWidth: 44
+                        Layout.preferredHeight: 44
+                        radius: 8
+                        color: Qt.rgba(0.0, 0.0, 0.0, 0.35)
+                        clip: true
+
+                        Image {
+                            anchors.fill: parent
+                            visible: Plasmoid.songRecognizer.coverUrl.length > 0 && status === Image.Ready
+                            source: Plasmoid.songRecognizer.coverUrl
+                            fillMode: Image.PreserveAspectCrop
+                            asynchronous: true
+                        }
+                        Kirigami.Icon {
+                            anchors.centerIn: parent
+                            width: 24
+                            height: 24
+                            visible: Plasmoid.songRecognizer.coverUrl.length === 0
+                            source: "emblem-music-symbolic"
+                        }
+                    }
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 2
+                        PlasmaComponents3.Label {
+                            Layout.fillWidth: true
+                            font.bold: true
+                            elide: Text.ElideRight
+                            text: Plasmoid.songRecognizer.title.length > 0
+                                ? Plasmoid.songRecognizer.title
+                                : i18n("Reconocimiento de música (Shazam)")
+                        }
+                        PlasmaComponents3.Label {
+                            Layout.fillWidth: true
+                            opacity: 0.82
+                            font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                            elide: Text.ElideRight
+                            text: Plasmoid.songRecognizer.title.length > 0
+                                ? Plasmoid.songRecognizer.artist
+                                : (Plasmoid.songRecognizer.status.length > 0
+                                    ? Plasmoid.songRecognizer.status
+                                    : i18n("Identifica lo que suena en tu equipo"))
+                        }
+                    }
+
+                    PlasmaComponents3.ToolButton {
+                        visible: Plasmoid.songRecognizer.shazamUrl.length > 0
+                        icon.name: "emblem-music-symbolic"
+                        onClicked: Plasmoid.songRecognizer.openInBrowser()
+                        QQC2.ToolTip.visible: hovered
+                        QQC2.ToolTip.text: i18n("Abrir en Shazam")
+                    }
+
+                    PlasmaComponents3.Button {
+                        icon.name: "audio-headphones-symbolic"
+                        text: Plasmoid.songRecognizer.listening ? i18n("Escuchando…") : i18n("Reconocer")
+                        enabled: !Plasmoid.songRecognizer.listening
+                        onClicked: Plasmoid.songRecognizer.recognize(9)
+                    }
+                }
+            }
+
+            // 4. Notification Digest (Apple Intelligence notification summaries via local Ollama)
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: digestCol.implicitHeight + Kirigami.Units.mediumSpacing * 2
+                Layout.preferredHeight: implicitHeight
+                radius: Kirigami.Units.mediumSpacing
+                color: Qt.rgba(0.02, 0.03, 0.05, 0.42)
+                border.width: 1
+                border.color: Qt.rgba(1.0, 1.0, 1.0, 0.15)
+
+                ColumnLayout {
+                    id: digestCol
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: Kirigami.Units.mediumSpacing
+                    spacing: Kirigami.Units.smallSpacing
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Kirigami.Units.smallSpacing
+
+                        Kirigami.Icon {
+                            source: "notifications-symbolic"
+                            implicitWidth: Kirigami.Units.iconSizes.small
+                            implicitHeight: Kirigami.Units.iconSizes.small
+                        }
+                        PlasmaComponents3.Label {
+                            Layout.fillWidth: true
+                            font.bold: true
+                            text: Plasmoid.notificationDigest.count > 0
+                                ? i18n("Notificaciones recientes (%1)", Plasmoid.notificationDigest.count)
+                                : i18n("Sin notificaciones recientes")
+                        }
+                        PlasmaComponents3.Button {
+                            visible: Plasmoid.notificationDigest.count > 0
+                            icon.name: "text-speak-symbolic"
+                            text: Plasmoid.notificationDigest.summarizing ? i18n("Resumiendo…") : i18n("Resumir")
+                            enabled: !Plasmoid.notificationDigest.summarizing
+                            onClicked: Plasmoid.notificationDigest.summarize()
+                        }
+                        PlasmaComponents3.ToolButton {
+                            visible: Plasmoid.notificationDigest.count > 0
+                            icon.name: "edit-clear-all-symbolic"
+                            onClicked: Plasmoid.notificationDigest.clear()
+                            QQC2.ToolTip.visible: hovered
+                            QQC2.ToolTip.text: i18n("Vaciar historial")
+                        }
+                    }
+
+                    PlasmaComponents3.Label {
+                        Layout.fillWidth: true
+                        visible: Plasmoid.notificationDigest.summary.length > 0
+                        wrapMode: Text.WordWrap
+                        font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                        color: "#e0f7fa"
+                        text: Plasmoid.notificationDigest.summary
+                    }
+
+                    PlasmaComponents3.Label {
+                        Layout.fillWidth: true
+                        visible: Plasmoid.notificationDigest.summary.length === 0 && Plasmoid.notificationDigest.count > 0
+                        elide: Text.ElideRight
+                        opacity: 0.8
+                        font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                        text: {
+                            const first = Plasmoid.notificationDigest.recent[0];
+                            return first ? ("[" + first.time + "] " + first.app + ": " + first.summary) : "";
+                        }
+                    }
+                }
+            }
+
+            // 5. Live Activity Timer Card with Progress Bar & Pause/Resume
             Rectangle {
                 Layout.fillWidth: true
                 implicitHeight: timerCol.implicitHeight + Kirigami.Units.mediumSpacing * 2
