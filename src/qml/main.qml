@@ -33,14 +33,15 @@ PlasmoidItem {
         Rectangle {
             id: pillCapsule
             anchors.centerIn: parent
-            width: parent.width - 8
-            height: Math.min(parent.height - 4, Kirigami.Units.gridUnit * 1.65)
+            width: parent.width - 6
+            height: Math.max(18, Math.min(parent.height - 2, Kirigami.Units.gridUnit * 1.75))
             radius: height / 2
             color: Qt.rgba(0.06, 0.07, 0.10, 0.94)
             border.width: 1
             border.color: Plasmoid.mediaPlaying
                 ? Qt.rgba(0.0, 0.90, 0.46, 0.48)
                 : (Plasmoid.timerActive ? Qt.rgba(1.0, 0.70, 0.0, 0.60) : Qt.rgba(1.0, 1.0, 1.0, 0.22))
+            clip: true
 
             // Specular top sheen
             Rectangle {
@@ -58,12 +59,17 @@ PlasmoidItem {
                 anchors.centerIn: parent
                 spacing: Kirigami.Units.mediumSpacing * 1.15
 
-                // Left side: Album Art / Video Thumbnail (if available) or Status Dot
+                // Left side: Album Art / Video Thumbnail dynamically sized inside pill height
                 Rectangle {
+                    id: compactArtFrame
                     visible: Plasmoid.trackArtUrl.length > 0 && !Plasmoid.timerActive
-                    implicitWidth: 20
-                    implicitHeight: 20
-                    radius: 5
+                    readonly property int boxSize: Math.max(12, pillCapsule.height - 6)
+                    implicitWidth: boxSize
+                    implicitHeight: boxSize
+                    Layout.preferredWidth: boxSize
+                    Layout.preferredHeight: boxSize
+                    Layout.alignment: Qt.AlignVCenter
+                    radius: Math.max(3, Math.round(boxSize * 0.24))
                     color: "#263238"
                     border.width: 1
                     border.color: Qt.rgba(1.0, 1.0, 1.0, 0.30)
@@ -83,6 +89,7 @@ PlasmoidItem {
                     visible: Plasmoid.trackArtUrl.length === 0 || Plasmoid.timerActive
                     implicitWidth: 8
                     implicitHeight: 8
+                    Layout.alignment: Qt.AlignVCenter
                     radius: 4
                     color: {
                         if (Plasmoid.kiriState === "listening") return "#00e5ff";
@@ -95,8 +102,9 @@ PlasmoidItem {
 
                 // Compact label: Clean Media title (without crowded ▶ symbol when cover art is shown), Countdown, or System Vitals
                 PlasmaComponents3.Label {
+                    Layout.alignment: Qt.AlignVCenter
                     color: "#ffffff"
-                    font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                    font.pixelSize: Math.min(Kirigami.Theme.smallFont.pixelSize, Math.max(10, pillCapsule.height - 8))
                     font.weight: Font.Medium
                     text: {
                         if (Plasmoid.timerActive) {
@@ -125,7 +133,8 @@ PlasmoidItem {
                         Rectangle {
                             required property var modelData
                             width: 3
-                            height: Plasmoid.mediaPlaying ? Math.max(4, Number(modelData) * 14) : 4
+                            readonly property real maxBarH: Math.max(8, pillCapsule.height - 8)
+                            height: Plasmoid.mediaPlaying ? Math.max(4, Number(modelData) * maxBarH) : 4
                             radius: 1.5
                             color: Plasmoid.mediaPlaying ? "#00e676" : "#90a4ae"
                             anchors.verticalCenter: parent.verticalCenter
