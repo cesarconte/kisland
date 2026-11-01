@@ -521,7 +521,7 @@ PlasmoidItem {
                     }
 
                     PlasmaComponents3.Label {
-                        font: Kirigami.Theme.smallFont
+                        font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                         font.bold: true
                         elide: Text.ElideRight
                         Layout.maximumWidth: Kirigami.Units.gridUnit * 6.5

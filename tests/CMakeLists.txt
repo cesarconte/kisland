@@ -5,6 +5,7 @@ target_compile_definitions(test_kisland PRIVATE KISLAND_SOURCE_DIR="${CMAKE_SOUR
 target_link_libraries(test_kisland PRIVATE
     Qt6::Core
     Qt6::DBus
+    Qt6::Gui
     Qt6::Qml
     Qt6::Test
 )

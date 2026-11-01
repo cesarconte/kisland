@@ -10,6 +10,7 @@
 #include <QDBusMessage>
 #include <QDBusVariant>
 #include <QFile>
+#include <QGuiApplication>
 #include <QQmlComponent>
 #include <QQmlEngine>
 #include <QRegularExpression>
@@ -190,6 +191,15 @@ private Q_SLOTS:
         QCOMPARE(micApp, QStringLiteral("Firefox"));
         QVERIFY(camActive);
         QCOMPARE(camApp, QStringLiteral("obs"));
+    }
+
+    void testMainQmlCompilesWithoutErrors()
+    {
+        QQmlEngine engine;
+        const QString qmlPath = QStringLiteral(KISLAND_SOURCE_DIR) + QStringLiteral("/src/qml/main.qml");
+        QVERIFY(QFile::exists(qmlPath));
+        QQmlComponent comp(&engine, QUrl::fromLocalFile(qmlPath));
+        QVERIFY2(!comp.isError(), qPrintable(comp.errorString()));
     }
 };
 
