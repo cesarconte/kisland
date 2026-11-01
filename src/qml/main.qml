@@ -66,12 +66,13 @@ PlasmoidItem {
                     color: {
                         if (Plasmoid.kiriState === "listening") return "#00e5ff";
                         if (Plasmoid.mediaPlaying) return "#00e676";
+                        if (Plasmoid.trackTitle.length > 0) return "#ffb300";
                         if (Plasmoid.timerActive) return "#ffb300";
                         return Kirigami.Theme.highlightColor;
                     }
                 }
 
-                // Compact label: Media title, Countdown, or System Vitals
+                // Compact label: Media title (Playing or Paused), Countdown, or System Vitals
                 PlasmaComponents3.Label {
                     color: "#ffffff"
                     font.pixelSize: Kirigami.Theme.smallFont.pixelSize
@@ -80,17 +81,18 @@ PlasmoidItem {
                         if (Plasmoid.timerActive) {
                             return "⏱ " + Plasmoid.timerRemainingText;
                         }
-                        if (Plasmoid.mediaPlaying && Plasmoid.trackTitle.length > 0) {
+                        if (Plasmoid.trackTitle.length > 0) {
+                            const prefix = Plasmoid.mediaPlaying ? "▶ " : "⏸ ";
                             const t = Plasmoid.trackTitle;
-                            return t.length > 22 ? t.substring(0, 22) + "…" : t;
+                            return prefix + (t.length > 24 ? t.substring(0, 24) + "…" : t);
                         }
                         return "CPU " + Plasmoid.cpuUsagePercent + "% · RAM " + Plasmoid.ramUsagePercent + "%";
                     }
                 }
 
-                // Live PipeWire Audio Spectrum Bars when Media is Playing
+                // Live PipeWire Audio Spectrum Bars when Media Track is Present
                 Row {
-                    visible: Plasmoid.mediaPlaying
+                    visible: Plasmoid.trackTitle.length > 0
                     spacing: 2
                     Layout.alignment: Qt.AlignVCenter
 
@@ -100,9 +102,9 @@ PlasmoidItem {
                         Rectangle {
                             required property var modelData
                             width: 3
-                            height: Math.max(4, Number(modelData) * 14)
+                            height: Plasmoid.mediaPlaying ? Math.max(4, Number(modelData) * 14) : 4
                             radius: 1.5
-                            color: "#00e676"
+                            color: Plasmoid.mediaPlaying ? "#00e676" : "#90a4ae"
                             anchors.verticalCenter: parent.verticalCenter
                             Behavior on height { NumberAnimation { duration: 80 } }
                         }
@@ -179,9 +181,18 @@ PlasmoidItem {
                                 opacity: 0.75
                                 font: Kirigami.Theme.smallFont
                                 elide: Text.ElideRight
-                                text: Plasmoid.trackArtist.length > 0
-                                    ? (Plasmoid.trackArtist + (Plasmoid.playerName.length > 0 ? " · " + Plasmoid.playerName : ""))
-                                    : i18n("Inicia música o vídeo en cualquier aplicación (MPRIS2)")
+                                text: {
+                                    if (Plasmoid.trackArtist.length > 0 && Plasmoid.playerName.length > 0) {
+                                        return Plasmoid.trackArtist + " · " + Plasmoid.playerName + (Plasmoid.mediaPlaying ? " (Reproduciendo)" : " (En pausa)");
+                                    }
+                                    if (Plasmoid.trackArtist.length > 0) {
+                                        return Plasmoid.trackArtist;
+                                    }
+                                    if (Plasmoid.playerName.length > 0) {
+                                        return "Reproductor: " + Plasmoid.playerName + (Plasmoid.mediaPlaying ? " · Reproduciendo" : " · En pausa");
+                                    }
+                                    return i18n("Inicia música o vídeo en cualquier aplicación (MPRIS2)");
+                                }
                             }
                         }
 

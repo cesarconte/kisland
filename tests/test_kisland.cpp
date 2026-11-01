@@ -4,6 +4,11 @@
 */
 
 #include <cmath>
+#include <QDBusArgument>
+#include <QDBusConnection>
+#include <QDBusConnectionInterface>
+#include <QDBusMessage>
+#include <QDBusVariant>
 #include <QFile>
 #include <QQmlComponent>
 #include <QQmlEngine>
@@ -55,6 +60,54 @@ private Q_SLOTS:
     {
         const QString metaPath = QStringLiteral(KISLAND_SOURCE_DIR) + QStringLiteral("/src/metadata.json");
         QVERIFY(QFile::exists(metaPath));
+    }
+
+    void testMprisAndPlayerctlParsing()
+    {
+        // Simulate mpv MPRIS line with title and URL but no artist or album (like an MKV video in mpv)
+        const QString line = QStringLiteral("Paused\tmpv\tEvil - S02E10 - O Is for Ovaphobia\t\t\tfile:///media/Series/Evil.S02E10.mkv");
+        const QStringList parts = line.split(QLatin1Char('\t'));
+        QCOMPARE(parts.size(), 6);
+        QCOMPARE(parts.at(0), QStringLiteral("Paused"));
+        QCOMPARE(parts.at(1), QStringLiteral("mpv"));
+        QCOMPARE(parts.at(2), QStringLiteral("Evil - S02E10 - O Is for Ovaphobia"));
+
+        // Live D-Bus test against active MPRIS2 session services (e.g. mpv)
+        if (auto *busIface = QDBusConnection::sessionBus().interface()) {
+            const QStringList services = busIface->registeredServiceNames().value();
+            for (const QString &srv : services) {
+                if (!srv.startsWith(QStringLiteral("org.mpris.MediaPlayer2."))) continue;
+
+                QDBusMessage getAllMsg = QDBusMessage::createMethodCall(
+                    srv,
+                    QStringLiteral("/org/mpris/MediaPlayer2"),
+                    QStringLiteral("org.freedesktop.DBus.Properties"),
+                    QStringLiteral("GetAll"));
+                getAllMsg << QStringLiteral("org.mpris.MediaPlayer2.Player");
+
+                const QDBusMessage reply = QDBusConnection::sessionBus().call(getAllMsg, QDBus::Block, 500);
+                QCOMPARE(reply.type(), QDBusMessage::ReplyMessage);
+                QVERIFY(!reply.arguments().isEmpty());
+
+                QVariantMap props;
+                const QDBusArgument arg = reply.arguments().first().value<QDBusArgument>();
+                arg >> props;
+                QVERIFY(props.contains(QStringLiteral("PlaybackStatus")));
+                QVERIFY(props.contains(QStringLiteral("Metadata")));
+
+                QVariant metaVar = props.value(QStringLiteral("Metadata"));
+                if (metaVar.userType() == qMetaTypeId<QDBusVariant>()) {
+                    metaVar = metaVar.value<QDBusVariant>().variant();
+                }
+                QVariantMap meta;
+                if (metaVar.userType() == qMetaTypeId<QDBusArgument>()) {
+                    metaVar.value<QDBusArgument>() >> meta;
+                }
+                const QString title = meta.value(QStringLiteral("xesam:title")).toString().trimmed();
+                qDebug() << "Detected live MPRIS2 player:" << srv << "status:" << props.value(QStringLiteral("PlaybackStatus")).toString() << "title:" << title;
+                QVERIFY(!title.isEmpty());
+            }
+        }
     }
 };
 

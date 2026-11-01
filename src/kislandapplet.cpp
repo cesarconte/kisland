@@ -9,12 +9,17 @@
 
 #include <KPluginFactory>
 
+#include <QDBusArgument>
 #include <QDBusConnection>
 #include <QDBusConnectionInterface>
 #include <QDBusInterface>
+#include <QDBusMessage>
 #include <QDBusReply>
+#include <QDBusVariant>
 #include <QFile>
+#include <QFileInfo>
 #include <QStandardPaths>
+#include <QUrl>
 
 K_PLUGIN_CLASS_WITH_JSON(KIslandApplet, "metadata.json")
 
@@ -93,6 +98,50 @@ QString KIslandApplet::formatCountdown(qint64 remainingSeconds)
         .arg(secs, 2, 10, QLatin1Char('0'));
 }
 
+QVariantMap KIslandApplet::extractMprisMetadata(const QVariant &metadataVariant)
+{
+    QVariantMap map;
+    QVariant unpacked = metadataVariant;
+    if (unpacked.userType() == qMetaTypeId<QDBusVariant>()) {
+        unpacked = unpacked.value<QDBusVariant>().variant();
+    }
+    if (unpacked.userType() == qMetaTypeId<QDBusArgument>()) {
+        const QDBusArgument arg = unpacked.value<QDBusArgument>();
+        arg >> map;
+    } else if (unpacked.canConvert<QVariantMap>()) {
+        map = unpacked.toMap();
+    }
+    return map;
+}
+
+QVariantMap KIslandApplet::parsePlayerctlLine(const QString &line)
+{
+    QVariantMap res;
+    const QStringList parts = line.trimmed().split(QLatin1Char('\t'));
+    if (parts.size() < 6) {
+        return res;
+    }
+    const QString status = parts.at(0).trimmed();
+    const QString player = parts.at(1).trimmed();
+    QString title = parts.at(2).trimmed();
+    const QString artist = parts.at(3).trimmed();
+    const QString album = parts.at(4).trimmed();
+    const QString urlStr = parts.at(5).trimmed();
+
+    if (title.isEmpty() && !urlStr.isEmpty()) {
+        const QUrl u(urlStr);
+        title = u.isLocalFile() ? QFileInfo(u.toLocalFile()).completeBaseName() : u.fileName();
+    }
+
+    res[QStringLiteral("playing")] = (status.compare(QStringLiteral("Playing"), Qt::CaseInsensitive) == 0);
+    res[QStringLiteral("status")] = status;
+    res[QStringLiteral("player")] = player;
+    res[QStringLiteral("title")] = title;
+    res[QStringLiteral("artist")] = artist;
+    res[QStringLiteral("album")] = album;
+    return res;
+}
+
 void KIslandApplet::pollMprisAndActivities()
 {
     updateSystemVitals();
@@ -114,7 +163,7 @@ void KIslandApplet::pollMprisAndActivities()
         Q_EMIT kiriStateChanged();
     }
 
-    // 2. Discover MPRIS2 Media Players on Session D-Bus
+    // 2. Discover MPRIS2 Media Players (D-Bus Properties.Get + playerctl fallback)
     bool foundPlaying = false;
     QString newTitle;
     QString newArtist;
@@ -128,31 +177,83 @@ void KIslandApplet::pollMprisAndActivities()
             if (!srv.startsWith(QStringLiteral("org.mpris.MediaPlayer2."))) {
                 continue;
             }
-            QDBusInterface playerIface(srv,
-                                       QStringLiteral("/org/mpris/MediaPlayer2"),
-                                       QStringLiteral("org.mpris.MediaPlayer2.Player"),
-                                       QDBusConnection::sessionBus());
-            if (!playerIface.isValid()) continue;
 
-            const QString status = playerIface.property("PlaybackStatus").toString();
-            const QVariantMap meta = qdbus_cast<QVariantMap>(playerIface.property("Metadata"));
-            const QString title = meta.value(QStringLiteral("xesam:title")).toString();
-            const QStringList artists = meta.value(QStringLiteral("xesam:artist")).toStringList();
-            const QString album = meta.value(QStringLiteral("xesam:album")).toString();
+            QDBusMessage getAllMsg = QDBusMessage::createMethodCall(
+                srv,
+                QStringLiteral("/org/mpris/MediaPlayer2"),
+                QStringLiteral("org.freedesktop.DBus.Properties"),
+                QStringLiteral("GetAll"));
+            getAllMsg << QStringLiteral("org.mpris.MediaPlayer2.Player");
 
-            if (status == QStringLiteral("Playing") || (chosenService.isEmpty() && !title.isEmpty())) {
+            const QDBusMessage reply = QDBusConnection::sessionBus().call(getAllMsg, QDBus::Block, 400);
+            if (reply.type() != QDBusMessage::ReplyMessage || reply.arguments().isEmpty()) {
+                continue;
+            }
+
+            const QVariantMap props = extractMprisMetadata(reply.arguments().first());
+            const QString status = props.value(QStringLiteral("PlaybackStatus")).toString().trimmed();
+            const QVariantMap meta = extractMprisMetadata(props.value(QStringLiteral("Metadata")));
+
+            QString title = meta.value(QStringLiteral("xesam:title")).toString().trimmed();
+            if (title.isEmpty()) {
+                const QString urlStr = meta.value(QStringLiteral("xesam:url")).toString().trimmed();
+                if (!urlStr.isEmpty()) {
+                    const QUrl u(urlStr);
+                    title = u.isLocalFile() ? QFileInfo(u.toLocalFile()).completeBaseName() : u.fileName();
+                }
+            }
+
+            QStringList artists = meta.value(QStringLiteral("xesam:artist")).toStringList();
+            if (artists.isEmpty() && !meta.value(QStringLiteral("xesam:artist")).toString().isEmpty()) {
+                artists << meta.value(QStringLiteral("xesam:artist")).toString();
+            }
+            const QString album = meta.value(QStringLiteral("xesam:album")).toString().trimmed();
+            const QString cleanPlayerName = srv.mid(23).section(QLatin1Char('.'), 0, 0);
+
+            const bool isPlayingNow = (status.compare(QStringLiteral("Playing"), Qt::CaseInsensitive) == 0);
+            if (isPlayingNow || (chosenService.isEmpty() && !title.isEmpty())) {
                 chosenService = srv;
-                foundPlaying = (status == QStringLiteral("Playing"));
+                foundPlaying = isPlayingNow;
                 newTitle = title;
                 newArtist = artists.join(QStringLiteral(", "));
                 newAlbum = album;
-                newPlayer = srv.mid(23);
-                if (foundPlaying) break;
+                newPlayer = cleanPlayerName;
+                if (foundPlaying) {
+                    break;
+                }
             }
         }
     }
 
-    const bool changed = (m_mediaPlaying != foundPlaying || m_trackTitle != newTitle || m_trackArtist != newArtist);
+    // Fallback to playerctl if D-Bus property map returned empty title
+    if (newTitle.isEmpty()) {
+        const QString playerctl = QStandardPaths::findExecutable(QStringLiteral("playerctl"));
+        if (!playerctl.isEmpty()) {
+            QProcess proc;
+            proc.start(playerctl, {QStringLiteral("-a"), QStringLiteral("metadata"), QStringLiteral("--format"),
+                                   QStringLiteral("{{status}}\t{{playerName}}\t{{title}}\t{{artist}}\t{{album}}\t{{xesam:url}}")});
+            if (proc.waitForFinished(500) && proc.exitCode() == 0) {
+                const QStringList lines = QString::fromUtf8(proc.readAllStandardOutput()).split(QLatin1Char('\n'), Qt::SkipEmptyParts);
+                for (const QString &l : lines) {
+                    const QVariantMap parsed = parsePlayerctlLine(l);
+                    if (parsed.isEmpty()) continue;
+                    const bool pl = parsed.value(QStringLiteral("playing")).toBool();
+                    const QString t = parsed.value(QStringLiteral("title")).toString();
+                    if (pl || (newTitle.isEmpty() && !t.isEmpty())) {
+                        foundPlaying = pl;
+                        newTitle = t;
+                        newArtist = parsed.value(QStringLiteral("artist")).toString();
+                        newAlbum = parsed.value(QStringLiteral("album")).toString();
+                        newPlayer = parsed.value(QStringLiteral("player")).toString();
+                        if (foundPlaying) break;
+                    }
+                }
+            }
+        }
+    }
+
+    const bool changed = (m_mediaPlaying != foundPlaying || m_trackTitle != newTitle
+                          || m_trackArtist != newArtist || m_playerName != newPlayer);
     m_mediaPlaying = foundPlaying;
     m_trackTitle = newTitle;
     m_trackArtist = newArtist;

@@ -58,6 +58,8 @@ public:
     // Static helpers for unit testing
     static QVariantList computeSpectrumBarsFromPcm(const QByteArray &pcmChunk, int barCount = 6);
     static QString formatCountdown(qint64 remainingSeconds);
+    static QVariantMap parsePlayerctlLine(const QString &line);
+    static QVariantMap extractMprisMetadata(const QVariant &metadataVariant);
 
 Q_SIGNALS:
     void mediaStateChanged();
