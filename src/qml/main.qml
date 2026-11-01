@@ -361,7 +361,10 @@ PlasmoidItem {
                                 hoverEnabled: true
                                 enabled: Plasmoid.trackTitle.length > 0
                                 cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                                onClicked: Plasmoid.raiseMediaPlayer()
+                                onClicked: {
+                                    root.expanded = false;
+                                    Plasmoid.raiseMediaPlayer();
+                                }
                             }
 
                             QQC2.ToolTip.visible: coverMouse.containsMouse && Plasmoid.trackTitle.length > 0

@@ -301,7 +301,7 @@ QVariantMap KIslandApplet::parseWpctlStatus(const QString &wpctlOutput, const QS
 
     static const QRegularExpression sinkLineRe(QStringLiteral(R"(^\s*│?\s*\*\s*\d+\.\s+(.+?)\s+\[vol:\s*([0-9.]+)(\s+MUTED)?\])"));
     // Stream client headers have <= 9 leading spaces (port lines like "163. monitor_FL" have 12+ spaces)
-    static const QRegularExpression streamHeaderRe(QStringLiteral(R"(^\s{1,9}\d+\.\s+([A-Za-z0-9_. -]+?)\s*$)"));
+    static const QRegularExpression streamHeaderRe(QStringLiteral(R"(^\s{1,9}\d+\.\s+([^<>]+?)\s*$)"));
 
     auto isPortName = [](const QString &name) {
         return name.startsWith(QStringLiteral("monitor_"))
@@ -729,12 +729,57 @@ void KIslandApplet::cycleLoopStatus()
 
 void KIslandApplet::raiseMediaPlayer()
 {
-    if (m_activeMprisService.isEmpty()) return;
-    QDBusInterface iface(m_activeMprisService,
-                         QStringLiteral("/org/mpris/MediaPlayer2"),
-                         QStringLiteral("org.mpris.MediaPlayer2"),
-                         QDBusConnection::sessionBus());
-    iface.asyncCall(QStringLiteral("Raise"));
+    if (!m_activeMprisService.isEmpty()) {
+        QDBusInterface iface(m_activeMprisService,
+                             QStringLiteral("/org/mpris/MediaPlayer2"),
+                             QStringLiteral("org.mpris.MediaPlayer2"),
+                             QDBusConnection::sessionBus());
+        iface.asyncCall(QStringLiteral("Raise"));
+    }
+
+    // Many players (including mpv-mpris on Wayland) report CanRaise=false.
+    // Use KWin Wayland's native Scripting D-Bus API to unminimize & activate the player window.
+    const QString target = m_playerName.trimmed().toLower();
+    if (target.isEmpty()) return;
+
+    const QString scriptPath = QDir::tempPath() + QStringLiteral("/kisland_kwin_raise.js");
+    QFile f(scriptPath);
+    if (f.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
+        const QString js = QStringLiteral(
+            "const target = \"%1\";\n"
+            "for (const w of workspace.windowList()) {\n"
+            "    const rc = (w.resourceClass || \"\").toString().toLowerCase();\n"
+            "    const rn = (w.resourceName || \"\").toString().toLowerCase();\n"
+            "    const df = (w.desktopFileName || \"\").toString().toLowerCase();\n"
+            "    const cap = (w.caption || \"\").toString().toLowerCase();\n"
+            "    if (rc.includes(target) || rn.includes(target) || df.includes(target) || cap.includes(target)) {\n"
+            "        if (w.minimized) w.minimized = false;\n"
+            "        workspace.activeWindow = w;\n"
+            "        break;\n"
+            "    }\n"
+            "}\n").arg(target);
+        f.write(js.toUtf8());
+        f.close();
+
+        QDBusInterface kwinScripting(QStringLiteral("org.kde.KWin"),
+                                     QStringLiteral("/Scripting"),
+                                     QStringLiteral("org.kde.kwin.Scripting"),
+                                     QDBusConnection::sessionBus());
+        if (kwinScripting.isValid()) {
+            const QString pluginName = QStringLiteral("kisland_raise_helper");
+            kwinScripting.call(QStringLiteral("unloadScript"), pluginName);
+            const QDBusReply<int> loadReply = kwinScripting.call(QStringLiteral("loadScript"), scriptPath, pluginName);
+            if (loadReply.isValid() && loadReply.value() >= 0) {
+                const QString scriptObjPath = QStringLiteral("/Scripting/Script%1").arg(loadReply.value());
+                QDBusInterface scriptIface(QStringLiteral("org.kde.KWin"),
+                                           scriptObjPath,
+                                           QStringLiteral("org.kde.kwin.Script"),
+                                           QDBusConnection::sessionBus());
+                scriptIface.call(QStringLiteral("run"));
+                kwinScripting.call(QStringLiteral("unloadScript"), pluginName);
+            }
+        }
+    }
 }
 
 void KIslandApplet::startQuickTimer(int durationSeconds, const QString &label)
@@ -865,8 +910,41 @@ void KIslandApplet::updatePipeWireAudioAndPrivacy()
 
     const bool newMic = parsed.value(QStringLiteral("micActive")).toBool();
     const QString newMicApp = parsed.value(QStringLiteral("micApp")).toString();
-    const bool newCam = parsed.value(QStringLiteral("cameraOrScreenActive")).toBool();
-    const QString newCamApp = parsed.value(QStringLiteral("cameraOrScreenApp")).toString();
+    bool newCam = parsed.value(QStringLiteral("cameraOrScreenActive")).toBool();
+    QString newCamApp = parsed.value(QStringLiteral("cameraOrScreenApp")).toString();
+
+    // Also detect direct V4L2 webcam usage (/dev/video*) in /proc/<pid>/fd for apps not routing video via PipeWire
+    if (!newCam) {
+        const QDir procDir(QStringLiteral("/proc"));
+        const QStringList pids = procDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+        for (const QString &pidStr : pids) {
+            bool ok = false;
+            pidStr.toInt(&ok);
+            if (!ok) continue;
+
+            const QDir fdDir(QStringLiteral("/proc/%1/fd").arg(pidStr));
+            const QFileInfoList fds = fdDir.entryInfoList(QDir::System | QDir::Files | QDir::NoDotAndDotDot);
+            for (const QFileInfo &fdInfo : fds) {
+                const QString target = fdInfo.symLinkTarget();
+                if (target.startsWith(QStringLiteral("/dev/video"))) {
+                    QFile commFile(QStringLiteral("/proc/%1/comm").arg(pidStr));
+                    QString comm;
+                    if (commFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+                        comm = QString::fromUtf8(commFile.readLine()).trimmed();
+                    }
+                    if (!comm.isEmpty()
+                        && comm != QStringLiteral("pipewire")
+                        && comm != QStringLiteral("wireplumber")
+                        && comm != QStringLiteral("xdg-desktop-por")) {
+                        newCam = true;
+                        newCamApp = comm;
+                        break;
+                    }
+                }
+            }
+            if (newCam) break;
+        }
+    }
 
     if (m_micActive != newMic || m_micApp != newMicApp
         || m_cameraOrScreenActive != newCam || m_cameraOrScreenApp != newCamApp) {
