@@ -1,0 +1,8 @@
+build/
+.cache/
+*.o
+*.so
+*.swp
+*~
+.kdev4/
+*.kdev4

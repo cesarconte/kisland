@@ -1,0 +1,25 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "cesar@cachyos.local",
+                "Name": "Cesar"
+            }
+        ],
+        "BugReportUrl": "https://github.com/cesarconte/kisland/issues",
+        "Category": "System Information",
+        "Description": "Dynamic Island & Live Activities al estilo Apple (MPRIS2, onda PipeWire, temporizadores Kiri y telemetría) para KDE Plasma 6",
+        "EnabledByDefault": true,
+        "Icon": "media-playback-start",
+        "Id": "org.cesar.kisland",
+        "License": "GPL-3.0-or-later",
+        "Name": "KIsland",
+        "Version": "0.1.0",
+        "Website": "https://github.com/cesarconte/kisland"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "X-Plasma-Provides": [
+        "org.kde.plasma.multimediacontrols"
+    ]
+}
