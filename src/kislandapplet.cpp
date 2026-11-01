@@ -9,6 +9,7 @@
 
 #include <KPluginFactory>
 
+#include <QCryptographicHash>
 #include <QDBusArgument>
 #include <QDBusConnection>
 #include <QDBusConnectionInterface>
@@ -16,6 +17,7 @@
 #include <QDBusMessage>
 #include <QDBusReply>
 #include <QDBusVariant>
+#include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QStandardPaths>
@@ -51,6 +53,8 @@ bool KIslandApplet::mediaPlaying() const { return m_mediaPlaying; }
 QString KIslandApplet::trackTitle() const { return m_trackTitle; }
 QString KIslandApplet::trackArtist() const { return m_trackArtist; }
 QString KIslandApplet::trackAlbum() const { return m_trackAlbum; }
+QString KIslandApplet::trackArtUrl() const { return m_trackArtUrl; }
+bool KIslandApplet::isVideoMedia() const { return m_isVideoMedia; }
 QString KIslandApplet::playerName() const { return m_playerName; }
 QVariantList KIslandApplet::spectrumBars() const { return m_spectrumBars; }
 bool KIslandApplet::timerActive() const { return m_timerActive; }
@@ -127,6 +131,7 @@ QVariantMap KIslandApplet::parsePlayerctlLine(const QString &line)
     const QString artist = parts.at(3).trimmed();
     const QString album = parts.at(4).trimmed();
     const QString urlStr = parts.at(5).trimmed();
+    const QString artUrlStr = parts.size() >= 7 ? parts.at(6).trimmed() : QString();
 
     if (title.isEmpty() && !urlStr.isEmpty()) {
         const QUrl u(urlStr);
@@ -139,7 +144,103 @@ QVariantMap KIslandApplet::parsePlayerctlLine(const QString &line)
     res[QStringLiteral("title")] = title;
     res[QStringLiteral("artist")] = artist;
     res[QStringLiteral("album")] = album;
+    res[QStringLiteral("url")] = urlStr;
+    res[QStringLiteral("artUrl")] = artUrlStr;
     return res;
+}
+
+QString KIslandApplet::resolveCoverArtOrVideoThumbnail(const QString &artUrl, const QString &mediaUrl, bool *isVideoOut)
+{
+    bool isVid = false;
+    QString localMediaPath;
+    if (!mediaUrl.isEmpty()) {
+        const QUrl u(mediaUrl);
+        localMediaPath = u.isLocalFile() ? u.toLocalFile() : mediaUrl;
+        const QString ext = QFileInfo(localMediaPath).suffix().toLower();
+        static const QStringList videoExts = {
+            QStringLiteral("mkv"), QStringLiteral("mp4"), QStringLiteral("webm"),
+            QStringLiteral("avi"), QStringLiteral("mov"), QStringLiteral("m4v"), QStringLiteral("ts")
+        };
+        if (videoExts.contains(ext)) {
+            isVid = true;
+        }
+    }
+    if (isVideoOut) {
+        *isVideoOut = isVid;
+    }
+
+    // 1. Direct mpris:artUrl if present and valid
+    if (!artUrl.trimmed().isEmpty()) {
+        const QUrl au(artUrl.trimmed());
+        if (au.isLocalFile()) {
+            if (QFileInfo::exists(au.toLocalFile())) {
+                return au.toString();
+            }
+        } else if (au.scheme() == QStringLiteral("http") || au.scheme() == QStringLiteral("https") || au.scheme() == QStringLiteral("data")) {
+            return au.toString();
+        }
+    }
+
+    if (localMediaPath.isEmpty() || !QFileInfo::exists(localMediaPath)) {
+        return QString();
+    }
+
+    const QFileInfo mediaFi(localMediaPath);
+    const QDir folder = mediaFi.absoluteDir();
+
+    // 2. Check standard folder cover / poster images next to the audio or video file
+    static const QStringList coverCandidates = {
+        QStringLiteral("cover.jpg"), QStringLiteral("cover.png"),
+        QStringLiteral("folder.jpg"), QStringLiteral("folder.png"),
+        QStringLiteral("poster.jpg"), QStringLiteral("poster.png"),
+        QStringLiteral("front.jpg"), QStringLiteral("album.jpg")
+    };
+    for (const QString &cand : coverCandidates) {
+        const QString candPath = folder.filePath(cand);
+        if (QFileInfo::exists(candPath)) {
+            return QUrl::fromLocalFile(candPath).toString();
+        }
+    }
+
+    const QByteArray pathHash = QCryptographicHash::hash(localMediaPath.toUtf8(), QCryptographicHash::Sha1).toHex();
+    const QString ffmpeg = QStandardPaths::findExecutable(QStringLiteral("ffmpeg"));
+
+    // 3. If it is a video file (like .mkv / .mp4 in mpv), extract a preview frame via ffmpeg (cached in /tmp)
+    if (isVid && !ffmpeg.isEmpty()) {
+        const QString thumbPath = QDir::tempPath() + QStringLiteral("/kisland_vidthumb_%1.jpg").arg(QString::fromLatin1(pathHash));
+        if (!QFileInfo::exists(thumbPath)) {
+            QProcess proc;
+            // Fast input seek (-ss 15) before -i takes <80ms on local NVMe/HDD
+            proc.start(ffmpeg, {QStringLiteral("-y"), QStringLiteral("-ss"), QStringLiteral("00:00:15"),
+                                QStringLiteral("-i"), localMediaPath,
+                                QStringLiteral("-frames:v"), QStringLiteral("1"),
+                                QStringLiteral("-vf"), QStringLiteral("scale=240:-1"),
+                                QStringLiteral("-q:v"), QStringLiteral("4"),
+                                thumbPath});
+            proc.waitForFinished(1200);
+        }
+        if (QFileInfo::exists(thumbPath) && QFileInfo(thumbPath).size() > 256) {
+            return QUrl::fromLocalFile(thumbPath).toString();
+        }
+    }
+
+    // 4. If it is an audio file with embedded ID3/FLAC cover art, extract via ffmpeg (cached in /tmp)
+    if (!isVid && !ffmpeg.isEmpty()) {
+        const QString artCachePath = QDir::tempPath() + QStringLiteral("/kisland_audiocover_%1.jpg").arg(QString::fromLatin1(pathHash));
+        if (!QFileInfo::exists(artCachePath)) {
+            QProcess proc;
+            proc.start(ffmpeg, {QStringLiteral("-y"), QStringLiteral("-i"), localMediaPath,
+                                QStringLiteral("-an"), QStringLiteral("-vcodec"), QStringLiteral("mjpeg"),
+                                QStringLiteral("-frames:v"), QStringLiteral("1"),
+                                artCachePath});
+            proc.waitForFinished(900);
+        }
+        if (QFileInfo::exists(artCachePath) && QFileInfo(artCachePath).size() > 256) {
+            return QUrl::fromLocalFile(artCachePath).toString();
+        }
+    }
+
+    return QString();
 }
 
 void KIslandApplet::pollMprisAndActivities()
@@ -168,6 +269,8 @@ void KIslandApplet::pollMprisAndActivities()
     QString newTitle;
     QString newArtist;
     QString newAlbum;
+    QString newRawArtUrl;
+    QString newMediaUrl;
     QString newPlayer;
     QString chosenService;
 
@@ -194,13 +297,12 @@ void KIslandApplet::pollMprisAndActivities()
             const QString status = props.value(QStringLiteral("PlaybackStatus")).toString().trimmed();
             const QVariantMap meta = extractMprisMetadata(props.value(QStringLiteral("Metadata")));
 
+            const QString urlStr = meta.value(QStringLiteral("xesam:url")).toString().trimmed();
+            const QString artUrlStr = meta.value(QStringLiteral("mpris:artUrl")).toString().trimmed();
             QString title = meta.value(QStringLiteral("xesam:title")).toString().trimmed();
-            if (title.isEmpty()) {
-                const QString urlStr = meta.value(QStringLiteral("xesam:url")).toString().trimmed();
-                if (!urlStr.isEmpty()) {
-                    const QUrl u(urlStr);
-                    title = u.isLocalFile() ? QFileInfo(u.toLocalFile()).completeBaseName() : u.fileName();
-                }
+            if (title.isEmpty() && !urlStr.isEmpty()) {
+                const QUrl u(urlStr);
+                title = u.isLocalFile() ? QFileInfo(u.toLocalFile()).completeBaseName() : u.fileName();
             }
 
             QStringList artists = meta.value(QStringLiteral("xesam:artist")).toStringList();
@@ -217,6 +319,8 @@ void KIslandApplet::pollMprisAndActivities()
                 newTitle = title;
                 newArtist = artists.join(QStringLiteral(", "));
                 newAlbum = album;
+                newRawArtUrl = artUrlStr;
+                newMediaUrl = urlStr;
                 newPlayer = cleanPlayerName;
                 if (foundPlaying) {
                     break;
@@ -231,7 +335,7 @@ void KIslandApplet::pollMprisAndActivities()
         if (!playerctl.isEmpty()) {
             QProcess proc;
             proc.start(playerctl, {QStringLiteral("-a"), QStringLiteral("metadata"), QStringLiteral("--format"),
-                                   QStringLiteral("{{status}}\t{{playerName}}\t{{title}}\t{{artist}}\t{{album}}\t{{xesam:url}}")});
+                                   QStringLiteral("{{status}}\t{{playerName}}\t{{title}}\t{{artist}}\t{{album}}\t{{xesam:url}}\t{{mpris:artUrl}}")});
             if (proc.waitForFinished(500) && proc.exitCode() == 0) {
                 const QStringList lines = QString::fromUtf8(proc.readAllStandardOutput()).split(QLatin1Char('\n'), Qt::SkipEmptyParts);
                 for (const QString &l : lines) {
@@ -244,6 +348,8 @@ void KIslandApplet::pollMprisAndActivities()
                         newTitle = t;
                         newArtist = parsed.value(QStringLiteral("artist")).toString();
                         newAlbum = parsed.value(QStringLiteral("album")).toString();
+                        newMediaUrl = parsed.value(QStringLiteral("url")).toString();
+                        newRawArtUrl = parsed.value(QStringLiteral("artUrl")).toString();
                         newPlayer = parsed.value(QStringLiteral("player")).toString();
                         if (foundPlaying) break;
                     }
@@ -252,12 +358,20 @@ void KIslandApplet::pollMprisAndActivities()
         }
     }
 
+    bool detectedIsVideo = false;
+    const QString resolvedArt = newTitle.isEmpty()
+        ? QString()
+        : resolveCoverArtOrVideoThumbnail(newRawArtUrl, newMediaUrl, &detectedIsVideo);
+
     const bool changed = (m_mediaPlaying != foundPlaying || m_trackTitle != newTitle
-                          || m_trackArtist != newArtist || m_playerName != newPlayer);
+                          || m_trackArtist != newArtist || m_playerName != newPlayer
+                          || m_trackArtUrl != resolvedArt || m_isVideoMedia != detectedIsVideo);
     m_mediaPlaying = foundPlaying;
     m_trackTitle = newTitle;
     m_trackArtist = newArtist;
     m_trackAlbum = newAlbum;
+    m_trackArtUrl = resolvedArt;
+    m_isVideoMedia = detectedIsVideo;
     m_playerName = newPlayer;
     m_activeMprisService = chosenService;
 

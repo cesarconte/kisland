@@ -19,6 +19,8 @@ class KIslandApplet : public Plasma::Applet
     Q_PROPERTY(QString trackTitle READ trackTitle NOTIFY mediaStateChanged)
     Q_PROPERTY(QString trackArtist READ trackArtist NOTIFY mediaStateChanged)
     Q_PROPERTY(QString trackAlbum READ trackAlbum NOTIFY mediaStateChanged)
+    Q_PROPERTY(QString trackArtUrl READ trackArtUrl NOTIFY mediaStateChanged)
+    Q_PROPERTY(bool isVideoMedia READ isVideoMedia NOTIFY mediaStateChanged)
     Q_PROPERTY(QString playerName READ playerName NOTIFY mediaStateChanged)
     Q_PROPERTY(QVariantList spectrumBars READ spectrumBars NOTIFY spectrumChanged)
     Q_PROPERTY(bool timerActive READ timerActive NOTIFY timerChanged)
@@ -38,6 +40,8 @@ public:
     QString trackTitle() const;
     QString trackArtist() const;
     QString trackAlbum() const;
+    QString trackArtUrl() const;
+    bool isVideoMedia() const;
     QString playerName() const;
     QVariantList spectrumBars() const;
     bool timerActive() const;
@@ -60,6 +64,7 @@ public:
     static QString formatCountdown(qint64 remainingSeconds);
     static QVariantMap parsePlayerctlLine(const QString &line);
     static QVariantMap extractMprisMetadata(const QVariant &metadataVariant);
+    static QString resolveCoverArtOrVideoThumbnail(const QString &artUrl, const QString &mediaUrl, bool *isVideoOut = nullptr);
 
 Q_SIGNALS:
     void mediaStateChanged();
@@ -82,6 +87,8 @@ private:
     QString m_trackTitle;
     QString m_trackArtist;
     QString m_trackAlbum;
+    QString m_trackArtUrl;
+    bool m_isVideoMedia = false;
     QString m_playerName;
     QString m_activeMprisService;
 

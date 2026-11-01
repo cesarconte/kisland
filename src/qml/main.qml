@@ -58,8 +58,29 @@ PlasmoidItem {
                 anchors.centerIn: parent
                 spacing: Kirigami.Units.smallSpacing
 
-                // Status / Kiri orb dot
+                // Left side: Album Art / Video Thumbnail (if available) or Status Dot
                 Rectangle {
+                    visible: Plasmoid.trackArtUrl.length > 0 && !Plasmoid.timerActive
+                    implicitWidth: 18
+                    implicitHeight: 18
+                    radius: 4
+                    color: "#263238"
+                    border.width: 1
+                    border.color: Qt.rgba(1.0, 1.0, 1.0, 0.35)
+                    clip: true
+
+                    Image {
+                        anchors.fill: parent
+                        anchors.margins: 1
+                        source: Plasmoid.trackArtUrl
+                        fillMode: Image.PreserveAspectCrop
+                        asynchronous: true
+                    }
+                }
+
+                // Status / Kiri orb dot (when no cover art is shown)
+                Rectangle {
+                    visible: Plasmoid.trackArtUrl.length === 0 || Plasmoid.timerActive
                     implicitWidth: 8
                     implicitHeight: 8
                     radius: 4
@@ -165,6 +186,37 @@ PlasmoidItem {
 
                     RowLayout {
                         Layout.fillWidth: true
+                        spacing: Kirigami.Units.mediumSpacing
+
+                        // Album Cover Art / Video Preview Frame (Apple Now Playing & Dynamic Island style)
+                        Rectangle {
+                            implicitWidth: Plasmoid.isVideoMedia ? 78 : 56
+                            implicitHeight: 56
+                            radius: 8
+                            color: Qt.rgba(0.0, 0.0, 0.0, 0.35)
+                            border.width: 1
+                            border.color: Qt.rgba(1.0, 1.0, 1.0, 0.22)
+                            clip: true
+
+                            Image {
+                                id: coverArtImg
+                                anchors.fill: parent
+                                anchors.margins: 1
+                                visible: Plasmoid.trackArtUrl.length > 0 && status === Image.Ready
+                                source: Plasmoid.trackArtUrl
+                                fillMode: Image.PreserveAspectCrop
+                                asynchronous: true
+                            }
+
+                            Kirigami.Icon {
+                                anchors.centerIn: parent
+                                visible: !coverArtImg.visible
+                                width: 28
+                                height: 28
+                                source: Plasmoid.isVideoMedia ? "video-x-generic" : "media-optical-audio"
+                            }
+                        }
+
                         ColumnLayout {
                             Layout.fillWidth: true
                             spacing: 2
@@ -178,18 +230,21 @@ PlasmoidItem {
                             }
                             PlasmaComponents3.Label {
                                 Layout.fillWidth: true
-                                opacity: 0.75
+                                opacity: 0.80
                                 font: Kirigami.Theme.smallFont
                                 elide: Text.ElideRight
                                 text: {
+                                    if (Plasmoid.trackArtist.length > 0 && Plasmoid.trackAlbum.length > 0) {
+                                        return Plasmoid.trackArtist + " — " + Plasmoid.trackAlbum;
+                                    }
                                     if (Plasmoid.trackArtist.length > 0 && Plasmoid.playerName.length > 0) {
-                                        return Plasmoid.trackArtist + " · " + Plasmoid.playerName + (Plasmoid.mediaPlaying ? " (Reproduciendo)" : " (En pausa)");
+                                        return Plasmoid.trackArtist + " · " + Plasmoid.playerName;
                                     }
                                     if (Plasmoid.trackArtist.length > 0) {
                                         return Plasmoid.trackArtist;
                                     }
                                     if (Plasmoid.playerName.length > 0) {
-                                        return "Reproductor: " + Plasmoid.playerName + (Plasmoid.mediaPlaying ? " · Reproduciendo" : " · En pausa");
+                                        return (Plasmoid.isVideoMedia ? "🎬 Vídeo en " : "🎵 Audio en ") + Plasmoid.playerName + (Plasmoid.mediaPlaying ? " · Reproduciendo" : " · En pausa");
                                     }
                                     return i18n("Inicia música o vídeo en cualquier aplicación (MPRIS2)");
                                 }

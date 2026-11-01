@@ -104,7 +104,8 @@ private Q_SLOTS:
                     metaVar.value<QDBusArgument>() >> meta;
                 }
                 const QString title = meta.value(QStringLiteral("xesam:title")).toString().trimmed();
-                qDebug() << "Detected live MPRIS2 player:" << srv << "status:" << props.value(QStringLiteral("PlaybackStatus")).toString() << "title:" << title;
+                const QString artUrl = meta.value(QStringLiteral("mpris:artUrl")).toString().trimmed();
+                qDebug() << "Detected live MPRIS2 player:" << srv << "status:" << props.value(QStringLiteral("PlaybackStatus")).toString() << "title:" << title << "artUrl:" << artUrl;
                 QVERIFY(!title.isEmpty());
             }
         }
