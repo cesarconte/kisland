@@ -123,6 +123,9 @@ private Q_SLOTS:
             " └─ Streams:\n"
             "       160. cava\n"
             "            116. input_FL        < SRS-XB13:monitor_FL\t[active]\n"
+            "       213. pw-record\n"
+            "            163. monitor_FL\n"
+            "            188. input_FL        < Easy Effects Source:capture_FL\t[active]\n"
             "       280. Firefox\n"
             "            119. input_FL        < Easy Effects Source:capture_FL\t[active]\n"
             "Video\n"
@@ -131,7 +134,7 @@ private Q_SLOTS:
             "            302. input_1         < kwin_wayland:output_1\t[active]\n");
 
         static const QRegularExpression sinkLineRe(QStringLiteral(R"(^\s*│?\s*\*\s*\d+\.\s+(.+?)\s+\[vol:\s*([0-9.]+)(\s+MUTED)?\])"));
-        static const QRegularExpression streamHeaderRe(QStringLiteral(R"(^\s*\d+\.\s+([A-Za-z0-9_. -]+?)\s*$)"));
+        static const QRegularExpression streamHeaderRe(QStringLiteral(R"(^\s{1,9}\d+\.\s+([A-Za-z0-9_. -]+?)\s*$)"));
 
         QString deviceName;
         int volPercent = 0;

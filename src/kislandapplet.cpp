@@ -300,7 +300,16 @@ QVariantMap KIslandApplet::parseWpctlStatus(const QString &wpctlOutput, const QS
     QString currentStreamClient;
 
     static const QRegularExpression sinkLineRe(QStringLiteral(R"(^\s*│?\s*\*\s*\d+\.\s+(.+?)\s+\[vol:\s*([0-9.]+)(\s+MUTED)?\])"));
-    static const QRegularExpression streamHeaderRe(QStringLiteral(R"(^\s*\d+\.\s+([A-Za-z0-9_. -]+?)\s*$)"));
+    // Stream client headers have <= 9 leading spaces (port lines like "163. monitor_FL" have 12+ spaces)
+    static const QRegularExpression streamHeaderRe(QStringLiteral(R"(^\s{1,9}\d+\.\s+([A-Za-z0-9_. -]+?)\s*$)"));
+
+    auto isPortName = [](const QString &name) {
+        return name.startsWith(QStringLiteral("monitor_"))
+            || name.startsWith(QStringLiteral("input_"))
+            || name.startsWith(QStringLiteral("output_"))
+            || name.startsWith(QStringLiteral("capture_"))
+            || name.startsWith(QStringLiteral("playback_"));
+    };
 
     for (const QString &rawLine : lines) {
         const QString trimmed = rawLine.trimmed();
@@ -344,19 +353,26 @@ QVariantMap KIslandApplet::parseWpctlStatus(const QString &wpctlOutput, const QS
         } else if (section == QStringLiteral("Audio") && subSection == QStringLiteral("Streams")) {
             const QRegularExpressionMatch hm = streamHeaderRe.match(rawLine);
             if (hm.hasMatch() && !rawLine.contains(QLatin1Char('<')) && !rawLine.contains(QLatin1Char('>'))) {
-                currentStreamClient = hm.captured(1).trimmed();
+                const QString candidate = hm.captured(1).trimmed();
+                if (!isPortName(candidate)) {
+                    currentStreamClient = candidate;
+                }
             } else if (rawLine.contains(QLatin1Char('<')) && rawLine.contains(QStringLiteral("[active]"))
                        && rawLine.contains(QStringLiteral(":capture_"))) {
                 if (!currentStreamClient.isEmpty()
+                    && !isPortName(currentStreamClient)
                     && !(currentStreamClient == QStringLiteral("pw-record") && kiriState != QStringLiteral("listening"))) {
                     micInUse = true;
-                    micAppName = currentStreamClient;
+                    micAppName = (currentStreamClient == QStringLiteral("pw-record")) ? QStringLiteral("Kiri") : currentStreamClient;
                 }
             }
         } else if (section == QStringLiteral("Video") && subSection == QStringLiteral("Streams")) {
             const QRegularExpressionMatch hm = streamHeaderRe.match(rawLine);
             if (hm.hasMatch() && !rawLine.contains(QLatin1Char('<')) && !rawLine.contains(QLatin1Char('>'))) {
-                currentStreamClient = hm.captured(1).trimmed();
+                const QString candidate = hm.captured(1).trimmed();
+                if (!isPortName(candidate)) {
+                    currentStreamClient = candidate;
+                }
             } else if (rawLine.contains(QStringLiteral("[active]"))) {
                 camInUse = true;
                 camAppName = currentStreamClient.isEmpty() ? QStringLiteral("Vídeo / Pantalla") : currentStreamClient;

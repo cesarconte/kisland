@@ -179,8 +179,16 @@ PlasmoidItem {
 
     fullRepresentation: Item {
         id: expandedIsland
-        implicitWidth: Kirigami.Units.gridUnit * 26
-        implicitHeight: Kirigami.Units.gridUnit * 24.5
+
+        readonly property int targetWidth: Math.max(Kirigami.Units.gridUnit * 29, mainColumn.implicitWidth + Kirigami.Units.largeSpacing * 2)
+        readonly property int targetHeight: mainColumn.implicitHeight + Kirigami.Units.largeSpacing * 2
+
+        implicitWidth: targetWidth
+        implicitHeight: targetHeight
+        Layout.minimumWidth: targetWidth
+        Layout.minimumHeight: targetHeight
+        Layout.preferredWidth: targetWidth
+        Layout.preferredHeight: targetHeight
 
         // Outer Liquid Glass Shell (matches Kiri & KDropover)
         Rectangle {
@@ -209,7 +217,10 @@ PlasmoidItem {
         }
 
         ColumnLayout {
-            anchors.fill: parent
+            id: mainColumn
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
             anchors.margins: Kirigami.Units.largeSpacing
             spacing: Kirigami.Units.mediumSpacing
 
@@ -230,6 +241,8 @@ PlasmoidItem {
                     border.color: Qt.rgba(1.0, 1.0, 1.0, 0.14)
                     implicitWidth: vitalsLbl.implicitWidth + 12
                     implicitHeight: vitalsLbl.implicitHeight + 6
+                    Layout.preferredWidth: implicitWidth
+                    Layout.preferredHeight: implicitHeight
 
                     PlasmaComponents3.Label {
                         id: vitalsLbl
@@ -249,6 +262,8 @@ PlasmoidItem {
                     border.color: "#ff9100"
                     implicitWidth: privLbl.implicitWidth + 12
                     implicitHeight: privLbl.implicitHeight + 6
+                    Layout.preferredWidth: implicitWidth
+                    Layout.preferredHeight: implicitHeight
 
                     PlasmaComponents3.Label {
                         id: privLbl
@@ -290,7 +305,8 @@ PlasmoidItem {
             // 1. Media Player Card (MPRIS2 + Interactive Scrubber + Shuffle/Loop + PipeWire Waveform)
             Rectangle {
                 Layout.fillWidth: true
-                implicitHeight: mediaCol.implicitHeight + Kirigami.Units.largeSpacing * 1.6
+                implicitHeight: mediaCol.implicitHeight + Kirigami.Units.mediumSpacing * 2
+                Layout.preferredHeight: implicitHeight
                 radius: Kirigami.Units.mediumSpacing
                 color: Qt.rgba(0.02, 0.03, 0.05, 0.42)
                 border.width: 1
@@ -298,7 +314,9 @@ PlasmoidItem {
 
                 ColumnLayout {
                     id: mediaCol
-                    anchors.fill: parent
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
                     anchors.margins: Kirigami.Units.mediumSpacing
                     spacing: Kirigami.Units.smallSpacing
 
@@ -308,8 +326,11 @@ PlasmoidItem {
 
                         // Clickable Album Cover Art / Video Preview Frame (Raises player window on click)
                         Rectangle {
-                            implicitWidth: Plasmoid.isVideoMedia ? 88 : 64
+                            readonly property int frameW: Plasmoid.isVideoMedia ? 88 : 64
+                            implicitWidth: frameW
                             implicitHeight: 64
+                            Layout.preferredWidth: frameW
+                            Layout.preferredHeight: 64
                             radius: 10
                             color: Qt.rgba(0.0, 0.0, 0.0, 0.35)
                             border.width: 1
@@ -385,7 +406,9 @@ PlasmoidItem {
                         // Live Equalizer Bars
                         Row {
                             spacing: 4
+                            Layout.alignment: Qt.AlignVCenter
                             Layout.leftMargin: Kirigami.Units.smallSpacing
+                            Layout.rightMargin: Kirigami.Units.smallSpacing
                             Repeater {
                                 model: Plasmoid.spectrumBars
                                 Rectangle {
@@ -410,6 +433,7 @@ PlasmoidItem {
                         PlasmaComponents3.Label {
                             font: Kirigami.Theme.smallFont
                             color: "#b0bec5"
+                            Layout.minimumWidth: 42
                             text: Plasmoid.trackElapsedText
                         }
 
@@ -426,6 +450,8 @@ PlasmoidItem {
                         PlasmaComponents3.Label {
                             font: Kirigami.Theme.smallFont
                             color: "#b0bec5"
+                            Layout.minimumWidth: 48
+                            horizontalAlignment: Text.AlignRight
                             text: Plasmoid.trackRemainingText
                         }
                     }
@@ -501,7 +527,8 @@ PlasmoidItem {
             // 2. PipeWire Output Volume & Active Sink Bar (Alcove / Control Center style)
             Rectangle {
                 Layout.fillWidth: true
-                implicitHeight: volRow.implicitHeight + Kirigami.Units.mediumSpacing * 1.6
+                implicitHeight: volRow.implicitHeight + Kirigami.Units.mediumSpacing * 1.8
+                Layout.preferredHeight: implicitHeight
                 radius: Kirigami.Units.mediumSpacing
                 color: Qt.rgba(0.02, 0.03, 0.05, 0.42)
                 border.width: 1
@@ -509,8 +536,11 @@ PlasmoidItem {
 
                 RowLayout {
                     id: volRow
-                    anchors.fill: parent
-                    anchors.margins: Kirigami.Units.smallSpacing * 1.5
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.leftMargin: Kirigami.Units.mediumSpacing
+                    anchors.rightMargin: Kirigami.Units.mediumSpacing
                     spacing: Kirigami.Units.smallSpacing
 
                     PlasmaComponents3.ToolButton {
@@ -541,7 +571,7 @@ PlasmoidItem {
                     PlasmaComponents3.Label {
                         font: Kirigami.Theme.smallFont
                         color: "#b0bec5"
-                        Layout.minimumWidth: 36
+                        Layout.minimumWidth: 42
                         horizontalAlignment: Text.AlignRight
                         text: Plasmoid.outputMuted ? i18n("Mudo") : (Plasmoid.outputVolumePercent + "%")
                     }
@@ -551,7 +581,8 @@ PlasmoidItem {
             // 3. Live Activity Timer Card with Progress Bar & Pause/Resume
             Rectangle {
                 Layout.fillWidth: true
-                implicitHeight: timerCol.implicitHeight + Kirigami.Units.mediumSpacing * 1.8
+                implicitHeight: timerCol.implicitHeight + Kirigami.Units.mediumSpacing * 2
+                Layout.preferredHeight: implicitHeight
                 radius: Kirigami.Units.mediumSpacing
                 color: Qt.rgba(0.02, 0.03, 0.05, 0.42)
                 border.width: 1
@@ -559,7 +590,9 @@ PlasmoidItem {
 
                 ColumnLayout {
                     id: timerCol
-                    anchors.fill: parent
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
                     anchors.margins: Kirigami.Units.mediumSpacing
                     spacing: Kirigami.Units.smallSpacing
 
@@ -619,8 +652,6 @@ PlasmoidItem {
                     }
                 }
             }
-
-            Item { Layout.fillHeight: true }
         }
     }
 }
