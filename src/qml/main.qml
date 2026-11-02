@@ -104,7 +104,7 @@ PlasmoidItem {
                     font.weight: Font.Medium
                     text: {
                         if (Plasmoid.songRecognizer.listening) {
-                            return i18n("Shazam: Escuchando…");
+                            return i18n("Escuchando…");
                         }
                         if (Plasmoid.songRecognizer.recognizedActive && Plasmoid.songRecognizer.title.length > 0) {
                             const song = Plasmoid.songRecognizer.title + (Plasmoid.songRecognizer.artist.length > 0 ? " — " + Plasmoid.songRecognizer.artist : "");
@@ -640,7 +640,9 @@ PlasmoidItem {
 
                             PlasmaComponents3.Label {
                                 Layout.fillWidth: true
-                                text: i18n("Escuchando audio del sistema vía PipeWire…")
+                                text: Plasmoid.songRecognizer.status.length > 0
+                                    ? Plasmoid.songRecognizer.status
+                                    : i18n("Escuchando música…")
                                 color: Kirigami.Theme.textColor
                                 font.weight: Font.Medium
                             }

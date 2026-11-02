@@ -183,7 +183,7 @@ void SongRecognizer::recognize(int seconds)
     }
     const QString pwRecord = QStandardPaths::findExecutable(QStringLiteral("pw-record"));
     if (pwRecord.isEmpty()) {
-        setStatus(QStringLiteral("pw-record no disponible (PipeWire)"), false);
+        setStatus(i18n("Grabador de audio no disponible"), false);
         return;
     }
 
@@ -198,7 +198,7 @@ void SongRecognizer::recognize(int seconds)
     // Capture default sink monitor via PipeWire (respects EasyEffects chain; no hw:* devices)
     m_rec->start(pwRecord, {QStringLiteral("--rate=44100"), QStringLiteral("--channels=1"), QStringLiteral("--format=s16"),
                             QStringLiteral("-P"), QStringLiteral("stream.capture.sink=true"), m_wavPath});
-    setStatus(QStringLiteral("Escuchando con Shazam…"), true);
+    setStatus(i18n("Escuchando música…"), true);
     m_stopTimer.start(qBound(4, seconds, 20) * 1000);
 }
 
@@ -215,10 +215,10 @@ void SongRecognizer::finishRecording()
         rec->deleteLater();
     }
     if (!QFileInfo::exists(m_wavPath) || QFileInfo(m_wavPath).size() < 20000) {
-        setStatus(QStringLiteral("No se capturó audio (¿hay algo sonando?)"), false);
+        setStatus(i18n("No se detectó audio"), false);
         return;
     }
-    setStatus(QStringLiteral("Identificando con Shazam…"), true);
+    setStatus(i18n("Buscando coincidencias…"), true);
     runBackend();
 }
 
@@ -256,7 +256,7 @@ void SongRecognizer::runBackend()
         Q_EMIT resultChanged();
 
         if (m_result.isEmpty()) {
-            setStatus(QStringLiteral("No se reconoció ninguna canción"), false);
+            setStatus(i18n("No se han encontrado resultados"), false);
             QTimer::singleShot(4000, this, [this]() {
                 if (!m_listening && !m_recognizedActive) {
                     setStatus(QString(), false);
