@@ -259,8 +259,10 @@ void SongRecognizer::sendPlasmaNotification(const QString &songTitle, const QStr
     }
 
     QVariantMap hints;
-    hints.insert(QStringLiteral("desktop-entry"), QStringLiteral("org.cesar.kisland"));
+    // Map to the host Plasma desktop entry so it is NOT blacklisted under "@other"
+    hints.insert(QStringLiteral("desktop-entry"), QStringLiteral("org.kde.plasmashell"));
     hints.insert(QStringLiteral("category"), QStringLiteral("music"));
+    hints.insert(QStringLiteral("urgency"), uchar(1)); // Normal urgency
 
     msg << QStringLiteral("KIsland")
         << 0u
