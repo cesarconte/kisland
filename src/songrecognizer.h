@@ -65,6 +65,9 @@ Q_SIGNALS:
     void recognizedActiveChanged();
     void historyChanged();
 
+private Q_SLOTS:
+    void onNotificationActionInvoked(uint id, const QString &actionKey);
+
 private:
     void setStatus(const QString &s, bool listening);
     void setRecognizedActive(bool active);
@@ -85,4 +88,5 @@ private:
     QVariantMap m_result;
     QVariantList m_history;
     QString m_historyFilePath;
+    QHash<uint, QString> m_notificationUrls;
 };

@@ -11,6 +11,10 @@
 #include <QClipboard>
 #include <QCoreApplication>
 #include <QDateTime>
+#include <QDBusConnection>
+#include <QDBusMessage>
+#include <QDBusPendingCallWatcher>
+#include <QDBusPendingReply>
 #include <QDesktopServices>
 #include <QDir>
 #include <QFile>
@@ -33,6 +37,16 @@ SongRecognizer::SongRecognizer(QObject *parent)
     connect(&m_autoDismissTimer, &QTimer::timeout, this, [this]() {
         setRecognizedActive(false);
     });
+
+    // Listen for notification action clicks (e.g. "Abrir en Shazam")
+    QDBusConnection::sessionBus().connect(
+        QStringLiteral("org.freedesktop.Notifications"),
+        QStringLiteral("/org/freedesktop/Notifications"),
+        QStringLiteral("org.freedesktop.Notifications"),
+        QStringLiteral("ActionInvoked"),
+        this,
+        SLOT(onNotificationActionInvoked(uint, QString))
+    );
 
     const QString dataDir = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + QStringLiteral("/kisland");
     QDir().mkpath(dataDir);
@@ -222,20 +236,50 @@ void SongRecognizer::finishRecording()
     runBackend();
 }
 
+void SongRecognizer::onNotificationActionInvoked(uint id, const QString &actionKey)
+{
+    if (actionKey == QStringLiteral("open_shazam") && m_notificationUrls.contains(id)) {
+        openUrl(m_notificationUrls.take(id));
+    }
+}
+
 void SongRecognizer::sendPlasmaNotification(const QString &songTitle, const QString &songArtist, const QString &url)
 {
-    auto *notif = new KNotification(QStringLiteral("notification"), KNotification::CloseOnTimeout, this);
-    notif->setComponentName(QStringLiteral("plasma_applet_org.cesar.kisland"));
-    notif->setTitle(i18n("Shazam — Canción identificada"));
-    notif->setText(QStringLiteral("%1\n%2").arg(songTitle, songArtist));
-    notif->setIconName(QStringLiteral("emblem-music-symbolic"));
+    // Native desktop notification via org.freedesktop.Notifications (integrated into Plasma's Notification Center)
+    QDBusMessage msg = QDBusMessage::createMethodCall(
+        QStringLiteral("org.freedesktop.Notifications"),
+        QStringLiteral("/org/freedesktop/Notifications"),
+        QStringLiteral("org.freedesktop.Notifications"),
+        QStringLiteral("Notify")
+    );
+
+    QStringList actions;
     if (!url.isEmpty()) {
-        auto *action = notif->addAction(i18n("Abrir en Shazam"));
-        connect(action, &KNotificationAction::activated, this, [this, url]() {
-            openUrl(url);
-        });
+        actions << QStringLiteral("open_shazam") << i18n("Abrir en Shazam");
     }
-    notif->sendEvent();
+
+    QVariantMap hints;
+    hints.insert(QStringLiteral("desktop-entry"), QStringLiteral("org.cesar.kisland"));
+    hints.insert(QStringLiteral("category"), QStringLiteral("music"));
+
+    msg << QStringLiteral("KIsland")
+        << 0u
+        << QStringLiteral("emblem-music-symbolic")
+        << i18n("Shazam — Canción identificada")
+        << QStringLiteral("<b>%1</b>\n%2").arg(songTitle.toHtmlEscaped(), songArtist.toHtmlEscaped())
+        << actions
+        << hints
+        << -1;
+
+    QDBusPendingReply<uint> reply = QDBusConnection::sessionBus().asyncCall(msg);
+    auto *watcher = new QDBusPendingCallWatcher(reply, this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this, [this, watcher, url](QDBusPendingCallWatcher *call) {
+        QDBusPendingReply<uint> rep = *call;
+        if (!rep.isError() && !url.isEmpty()) {
+            m_notificationUrls.insert(rep.value(), url);
+        }
+        call->deleteLater();
+    });
 }
 
 void SongRecognizer::runBackend()

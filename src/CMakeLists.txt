@@ -44,3 +44,4 @@ target_link_libraries(org.cesar.kisland PRIVATE
 )
 
 install(PROGRAMS ${CMAKE_SOURCE_DIR}/scripts/shazam_recognize.py DESTINATION ${KDE_INSTALL_DATADIR}/kisland)
+install(FILES org.cesar.kisland.notifyrc DESTINATION ${KDE_INSTALL_KNOTIFYRCDIR})
