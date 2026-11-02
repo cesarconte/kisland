@@ -5,8 +5,8 @@
       http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
   <kcfgfile name=""/>
   <group name="General">
-    <entry name="liquidGlassEnabled" type="Bool">
-      <label>Enable Liquid Glass specular border on the Dynamic Island pill</label>
+    <entry name="autoExpand" type="Bool">
+      <label>Expandir automáticamente con notificaciones de medios</label>
       <default>true</default>
     </entry>
   </group>
