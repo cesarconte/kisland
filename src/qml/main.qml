@@ -18,7 +18,7 @@ PlasmoidItem {
     id: root
 
     preferredRepresentation: compactRepresentation
-    Plasmoid.backgroundHints: PlasmaCore.Types.TranslucentBackground
+    Plasmoid.backgroundHints: PlasmaCore.Types.DefaultBackground
 
     compactRepresentation: Item {
         id: compactPillRoot
@@ -190,32 +190,6 @@ PlasmoidItem {
         Layout.preferredWidth: targetWidth
         Layout.preferredHeight: targetHeight
 
-        // Outer Liquid Glass Shell (matches Kiri & KDropover)
-        Rectangle {
-            id: islandGlassShell
-            anchors.fill: parent
-            anchors.margins: 2
-            radius: Kirigami.Units.largeSpacing
-            color: Qt.rgba(0.08, 0.09, 0.13, 0.88)
-            border.width: 1
-            border.color: Plasmoid.mediaPlaying
-                ? Qt.rgba(0.0, 0.90, 0.46, 0.45)
-                : Qt.rgba(1.0, 1.0, 1.0, 0.24)
-
-            Rectangle {
-                anchors.fill: parent
-                anchors.margins: 1
-                radius: Math.max(0, islandGlassShell.radius - 1)
-                gradient: Gradient {
-                    GradientStop { position: 0.0; color: Qt.rgba(1.0, 1.0, 1.0, 0.15) }
-                    GradientStop { position: 0.35; color: Qt.rgba(1.0, 1.0, 1.0, 0.02) }
-                    GradientStop { position: 1.0; color: Qt.rgba(0.0, 0.0, 0.0, 0.14) }
-                }
-                border.width: 1
-                border.color: Qt.rgba(1.0, 1.0, 1.0, 0.10)
-            }
-        }
-
         ColumnLayout {
             id: mainColumn
             anchors.left: parent.left
@@ -235,10 +209,10 @@ PlasmoidItem {
                 }
 
                 Rectangle {
-                    radius: 8
-                    color: Qt.rgba(1.0, 1.0, 1.0, 0.08)
+                    radius: 6
+                    color: Kirigami.Theme.alternateBackgroundColor
                     border.width: 1
-                    border.color: Qt.rgba(1.0, 1.0, 1.0, 0.14)
+                    border.color: Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.15)
                     implicitWidth: vitalsLbl.implicitWidth + 12
                     implicitHeight: vitalsLbl.implicitHeight + 6
                     Layout.preferredWidth: implicitWidth
@@ -248,7 +222,8 @@ PlasmoidItem {
                         id: vitalsLbl
                         anchors.centerIn: parent
                         font: Kirigami.Theme.smallFont
-                        color: "#b0bec5"
+                        color: Kirigami.Theme.textColor
+                        opacity: 0.85
                         text: "CPU " + Plasmoid.cpuUsagePercent + "% · RAM " + Plasmoid.ramUsagePercent + "%"
                     }
                 }
@@ -256,10 +231,10 @@ PlasmoidItem {
                 // Active Privacy Pill inside Expanded Island
                 Rectangle {
                     visible: Plasmoid.micActive || Plasmoid.cameraOrScreenActive
-                    radius: 8
-                    color: Qt.rgba(1.0, 0.57, 0.0, 0.18)
+                    radius: 6
+                    color: Qt.rgba(Kirigami.Theme.neutralTextColor.r, Kirigami.Theme.neutralTextColor.g, Kirigami.Theme.neutralTextColor.b, 0.15)
                     border.width: 1
-                    border.color: "#ff9100"
+                    border.color: Kirigami.Theme.neutralTextColor
                     implicitWidth: privLbl.implicitWidth + 12
                     implicitHeight: privLbl.implicitHeight + 6
                     Layout.preferredWidth: implicitWidth
@@ -269,7 +244,7 @@ PlasmoidItem {
                         id: privLbl
                         anchors.centerIn: parent
                         font: Kirigami.Theme.smallFont
-                        color: "#ffd180"
+                        color: Kirigami.Theme.neutralTextColor
                         text: {
                             const parts = [];
                             if (Plasmoid.micActive) parts.push("🎙️ " + Plasmoid.micApp);
@@ -307,10 +282,10 @@ PlasmoidItem {
                 Layout.fillWidth: true
                 implicitHeight: mediaCol.implicitHeight + Kirigami.Units.mediumSpacing * 2
                 Layout.preferredHeight: implicitHeight
-                radius: Kirigami.Units.mediumSpacing
-                color: Qt.rgba(0.02, 0.03, 0.05, 0.42)
+                radius: Kirigami.Units.smallSpacing
+                color: Kirigami.Theme.alternateBackgroundColor
                 border.width: 1
-                border.color: Qt.rgba(1.0, 1.0, 1.0, 0.15)
+                border.color: Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.15)
 
                 ColumnLayout {
                     id: mediaCol
@@ -331,10 +306,10 @@ PlasmoidItem {
                             implicitHeight: 64
                             Layout.preferredWidth: frameW
                             Layout.preferredHeight: 64
-                            radius: 10
-                            color: Qt.rgba(0.0, 0.0, 0.0, 0.35)
+                            radius: 8
+                            color: Kirigami.Theme.backgroundColor
                             border.width: 1
-                            border.color: coverMouse.containsMouse ? "#00e5ff" : Qt.rgba(1.0, 1.0, 1.0, 0.25)
+                            border.color: coverMouse.containsMouse ? Kirigami.Theme.highlightColor : Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.20)
                             clip: true
 
                             Image {
@@ -435,7 +410,8 @@ PlasmoidItem {
 
                         PlasmaComponents3.Label {
                             font: Kirigami.Theme.smallFont
-                            color: "#b0bec5"
+                            color: Kirigami.Theme.textColor
+                            opacity: 0.75
                             Layout.minimumWidth: 42
                             text: Plasmoid.trackElapsedText
                         }
@@ -452,7 +428,8 @@ PlasmoidItem {
 
                         PlasmaComponents3.Label {
                             font: Kirigami.Theme.smallFont
-                            color: "#b0bec5"
+                            color: Kirigami.Theme.textColor
+                            opacity: 0.75
                             Layout.minimumWidth: 48
                             horizontalAlignment: Text.AlignRight
                             text: Plasmoid.trackRemainingText
@@ -532,10 +509,10 @@ PlasmoidItem {
                 Layout.fillWidth: true
                 implicitHeight: volRow.implicitHeight + Kirigami.Units.mediumSpacing * 1.8
                 Layout.preferredHeight: implicitHeight
-                radius: Kirigami.Units.mediumSpacing
-                color: Qt.rgba(0.02, 0.03, 0.05, 0.42)
+                radius: Kirigami.Units.smallSpacing
+                color: Kirigami.Theme.alternateBackgroundColor
                 border.width: 1
-                border.color: Qt.rgba(1.0, 1.0, 1.0, 0.15)
+                border.color: Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.15)
 
                 RowLayout {
                     id: volRow
@@ -573,7 +550,8 @@ PlasmoidItem {
 
                     PlasmaComponents3.Label {
                         font: Kirigami.Theme.smallFont
-                        color: "#b0bec5"
+                        color: Kirigami.Theme.textColor
+                        opacity: 0.85
                         Layout.minimumWidth: 42
                         horizontalAlignment: Text.AlignRight
                         text: Plasmoid.outputMuted ? i18n("Mudo") : (Plasmoid.outputVolumePercent + "%")
@@ -586,10 +564,10 @@ PlasmoidItem {
                 Layout.fillWidth: true
                 implicitHeight: songRow.implicitHeight + Kirigami.Units.mediumSpacing * 2
                 Layout.preferredHeight: implicitHeight
-                radius: Kirigami.Units.mediumSpacing
-                color: Qt.rgba(0.02, 0.03, 0.05, 0.42)
+                radius: Kirigami.Units.smallSpacing
+                color: Kirigami.Theme.alternateBackgroundColor
                 border.width: 1
-                border.color: Plasmoid.songRecognizer.listening ? "#00e5ff" : Qt.rgba(1.0, 1.0, 1.0, 0.15)
+                border.color: Plasmoid.songRecognizer.listening ? Kirigami.Theme.highlightColor : Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.15)
 
                 RowLayout {
                     id: songRow
@@ -605,8 +583,10 @@ PlasmoidItem {
                         implicitHeight: 44
                         Layout.preferredWidth: 44
                         Layout.preferredHeight: 44
-                        radius: 8
-                        color: Qt.rgba(0.0, 0.0, 0.0, 0.35)
+                        radius: 6
+                        color: Kirigami.Theme.backgroundColor
+                        border.width: 1
+                        border.color: Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.20)
                         clip: true
 
                         Image {
@@ -671,10 +651,10 @@ PlasmoidItem {
                 Layout.fillWidth: true
                 implicitHeight: digestCol.implicitHeight + Kirigami.Units.mediumSpacing * 2
                 Layout.preferredHeight: implicitHeight
-                radius: Kirigami.Units.mediumSpacing
-                color: Qt.rgba(0.02, 0.03, 0.05, 0.42)
+                radius: Kirigami.Units.smallSpacing
+                color: Kirigami.Theme.alternateBackgroundColor
                 border.width: 1
-                border.color: Qt.rgba(1.0, 1.0, 1.0, 0.15)
+                border.color: Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.15)
 
                 ColumnLayout {
                     id: digestCol
@@ -721,7 +701,7 @@ PlasmoidItem {
                         visible: Plasmoid.notificationDigest.summary.length > 0
                         wrapMode: Text.WordWrap
                         font.pixelSize: Kirigami.Theme.smallFont.pixelSize
-                        color: "#e0f7fa"
+                        color: Kirigami.Theme.textColor
                         text: Plasmoid.notificationDigest.summary
                     }
 
@@ -744,10 +724,10 @@ PlasmoidItem {
                 Layout.fillWidth: true
                 implicitHeight: timerCol.implicitHeight + Kirigami.Units.mediumSpacing * 2
                 Layout.preferredHeight: implicitHeight
-                radius: Kirigami.Units.mediumSpacing
-                color: Qt.rgba(0.02, 0.03, 0.05, 0.42)
+                radius: Kirigami.Units.smallSpacing
+                color: Kirigami.Theme.alternateBackgroundColor
                 border.width: 1
-                border.color: Plasmoid.timerActive ? Qt.rgba(1.0, 0.70, 0.0, 0.45) : Qt.rgba(1.0, 1.0, 1.0, 0.15)
+                border.color: Plasmoid.timerActive ? Kirigami.Theme.highlightColor : Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.15)
 
                 ColumnLayout {
                     id: timerCol
