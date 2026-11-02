@@ -31,6 +31,7 @@ find_package(KF6 ${KF_MIN_VERSION} REQUIRED COMPONENTS
     Config
     CoreAddons
     I18n
+    Notifications
 )
 
 find_package(Plasma REQUIRED)

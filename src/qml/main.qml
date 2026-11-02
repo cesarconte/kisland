@@ -47,10 +47,10 @@ PlasmoidItem {
                 anchors.centerIn: parent
                 spacing: Kirigami.Units.mediumSpacing * 1.15
 
-                // Left side: Album Art / Video Thumbnail or Fallback Music Icon in rounded box
+                // Left side: Album Art / Video Thumbnail or Shazam Icon or Fallback Music Icon in rounded box
                 Rectangle {
                     id: compactArtFrame
-                    visible: Plasmoid.trackTitle.length > 0 && !Plasmoid.timerActive
+                    visible: (Plasmoid.songRecognizer.listening || Plasmoid.songRecognizer.recognizedActive || Plasmoid.trackTitle.length > 0) && !Plasmoid.timerActive
                     readonly property int boxSize: Math.max(12, pillCapsule.height - 6)
                     implicitWidth: boxSize
                     implicitHeight: boxSize
@@ -66,25 +66,25 @@ PlasmoidItem {
                     Image {
                         anchors.fill: parent
                         anchors.margins: 1
-                        source: Plasmoid.trackArtUrl
+                        source: Plasmoid.songRecognizer.recognizedActive ? Plasmoid.songRecognizer.coverUrl : Plasmoid.trackArtUrl
                         fillMode: Image.PreserveAspectCrop
                         asynchronous: true
-                        visible: Plasmoid.trackArtUrl.length > 0
+                        visible: source.toString().length > 0
                     }
 
                     Kirigami.Icon {
                         anchors.centerIn: parent
                         width: Math.max(10, parent.width - 4)
                         height: Math.max(10, parent.height - 4)
-                        source: "audio-x-generic"
-                        color: Kirigami.Theme.highlightColor
-                        visible: Plasmoid.trackArtUrl.length === 0
+                        source: (Plasmoid.songRecognizer.listening || Plasmoid.songRecognizer.recognizedActive) ? "emblem-music-symbolic" : "audio-x-generic"
+                        color: (Plasmoid.songRecognizer.listening || Plasmoid.songRecognizer.recognizedActive) ? "#0088ff" : Kirigami.Theme.highlightColor
+                        visible: !Plasmoid.songRecognizer.recognizedActive ? (Plasmoid.trackArtUrl.length === 0 || Plasmoid.songRecognizer.listening) : (Plasmoid.songRecognizer.coverUrl.length === 0)
                     }
                 }
 
-                // Status / Kiri orb dot (when no track is playing)
+                // Status / Kiri orb dot (when no track or shazam is active)
                 Rectangle {
-                    visible: Plasmoid.trackTitle.length === 0 || Plasmoid.timerActive
+                    visible: (!Plasmoid.songRecognizer.listening && !Plasmoid.songRecognizer.recognizedActive && Plasmoid.trackTitle.length === 0) || Plasmoid.timerActive
                     implicitWidth: 8
                     implicitHeight: 8
                     Layout.alignment: Qt.AlignVCenter
@@ -96,13 +96,20 @@ PlasmoidItem {
                     }
                 }
 
-                // Compact label: Clean Media title (no play icons, matching macOS Dynamic Island), Countdown, or System Vitals
+                // Compact label: Clean Media title (no play icons, matching macOS Dynamic Island), Shazam, Countdown, or System Vitals
                 PlasmaComponents3.Label {
                     Layout.alignment: Qt.AlignVCenter
                     color: Kirigami.Theme.textColor
                     font.pixelSize: Math.min(Kirigami.Theme.smallFont.pixelSize, Math.max(10, pillCapsule.height - 8))
                     font.weight: Font.Medium
                     text: {
+                        if (Plasmoid.songRecognizer.listening) {
+                            return i18n("Shazam: Escuchando…");
+                        }
+                        if (Plasmoid.songRecognizer.recognizedActive && Plasmoid.songRecognizer.title.length > 0) {
+                            const song = Plasmoid.songRecognizer.title + (Plasmoid.songRecognizer.artist.length > 0 ? " — " + Plasmoid.songRecognizer.artist : "");
+                            return song.length > 28 ? song.substring(0, 28) + "…" : song;
+                        }
                         if (Plasmoid.timerActive) {
                             return "⏱  " + Plasmoid.timerRemainingText;
                         }
@@ -114,9 +121,9 @@ PlasmoidItem {
                     }
                 }
 
-                // Live PipeWire Audio Spectrum Bars when Media Track is Present
+                // Live PipeWire Audio Spectrum Bars when Media Track or Shazam is Present
                 Row {
-                    visible: Plasmoid.trackTitle.length > 0
+                    visible: Plasmoid.trackTitle.length > 0 || Plasmoid.songRecognizer.listening
                     spacing: 3
                     Layout.alignment: Qt.AlignVCenter
 
@@ -127,9 +134,9 @@ PlasmoidItem {
                             required property var modelData
                             width: 3
                             readonly property real maxBarH: Math.max(8, pillCapsule.height - 8)
-                            height: Plasmoid.mediaPlaying ? Math.max(4, Number(modelData) * maxBarH) : 4
+                            height: (Plasmoid.mediaPlaying || Plasmoid.songRecognizer.listening) ? Math.max(4, Number(modelData) * maxBarH) : 4
                             radius: 1.5
-                            color: Plasmoid.mediaPlaying ? Kirigami.Theme.highlightColor : Kirigami.Theme.disabledTextColor
+                            color: Plasmoid.songRecognizer.listening ? "#0088ff" : (Plasmoid.mediaPlaying ? Kirigami.Theme.highlightColor : Kirigami.Theme.disabledTextColor)
                             anchors.verticalCenter: parent.verticalCenter
                             Behavior on height { NumberAnimation { duration: 80 } }
                         }
@@ -554,86 +561,289 @@ PlasmoidItem {
             // 3. Music Recognition (macOS Shazam integration) — listens to the PipeWire default sink
             Rectangle {
                 Layout.fillWidth: true
-                implicitHeight: songRow.implicitHeight + Kirigami.Units.mediumSpacing * 2
+                implicitHeight: shazamCol.implicitHeight + Kirigami.Units.mediumSpacing * 2
                 Layout.preferredHeight: implicitHeight
                 radius: Kirigami.Units.smallSpacing
                 color: Kirigami.Theme.alternateBackgroundColor
                 border.width: 1
-                border.color: Plasmoid.songRecognizer.listening ? Kirigami.Theme.highlightColor : Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.15)
+                border.color: Plasmoid.songRecognizer.listening ? "#0088ff" : Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.15)
 
-                RowLayout {
-                    id: songRow
+                ColumnLayout {
+                    id: shazamCol
                     anchors.left: parent.left
                     anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    anchors.leftMargin: Kirigami.Units.mediumSpacing
-                    anchors.rightMargin: Kirigami.Units.mediumSpacing
-                    spacing: Kirigami.Units.mediumSpacing
+                    anchors.top: parent.top
+                    anchors.margins: Kirigami.Units.mediumSpacing
+                    spacing: Kirigami.Units.smallSpacing
 
-                    Rectangle {
-                        implicitWidth: 44
-                        implicitHeight: 44
-                        Layout.preferredWidth: 44
-                        Layout.preferredHeight: 44
-                        radius: 6
-                        color: Kirigami.Theme.backgroundColor
-                        border.width: 1
-                        border.color: Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.20)
-                        clip: true
-
-                        Image {
-                            anchors.fill: parent
-                            visible: Plasmoid.songRecognizer.coverUrl.length > 0 && status === Image.Ready
-                            source: Plasmoid.songRecognizer.coverUrl
-                            fillMode: Image.PreserveAspectCrop
-                            asynchronous: true
-                        }
-                        Kirigami.Icon {
-                            anchors.centerIn: parent
-                            width: 24
-                            height: 24
-                            visible: Plasmoid.songRecognizer.coverUrl.length === 0
-                            source: "emblem-music-symbolic"
-                        }
-                    }
-
-                    ColumnLayout {
+                    // Header row: Title + Actions
+                    RowLayout {
                         Layout.fillWidth: true
-                        spacing: 2
+                        spacing: Kirigami.Units.smallSpacing
+
+                        Kirigami.Icon {
+                            Layout.preferredWidth: 20
+                            Layout.preferredHeight: 20
+                            source: "emblem-music-symbolic"
+                            color: Plasmoid.songRecognizer.listening ? "#0088ff" : Kirigami.Theme.highlightColor
+                        }
+
                         PlasmaComponents3.Label {
                             Layout.fillWidth: true
                             font.bold: true
-                            elide: Text.ElideRight
-                            text: Plasmoid.songRecognizer.title.length > 0
-                                ? Plasmoid.songRecognizer.title
-                                : i18n("Reconocimiento de música (Shazam)")
+                            text: i18n("Reconocimiento de música (Shazam)")
                         }
+
+                        PlasmaComponents3.ToolButton {
+                            visible: Plasmoid.songRecognizer.history.length > 0
+                            icon.name: "edit-clear-history"
+                            onClicked: Plasmoid.songRecognizer.clearHistory()
+                            QQC2.ToolTip.visible: hovered
+                            QQC2.ToolTip.text: i18n("Limpiar historial de Shazam")
+                        }
+
+                        PlasmaComponents3.Button {
+                            visible: !Plasmoid.songRecognizer.listening
+                            icon.name: "audio-headphones-symbolic"
+                            text: i18n("Reconocer canción")
+                            onClicked: Plasmoid.songRecognizer.recognize(9)
+                        }
+
+                        PlasmaComponents3.Button {
+                            visible: Plasmoid.songRecognizer.listening
+                            icon.name: "process-stop-symbolic"
+                            text: i18n("Cancelar")
+                            onClicked: Plasmoid.songRecognizer.cancel()
+                        }
+                    }
+
+                    // Listening State Card
+                    Rectangle {
+                        visible: Plasmoid.songRecognizer.listening
+                        Layout.fillWidth: true
+                        implicitHeight: 44
+                        radius: Kirigami.Units.smallSpacing
+                        color: Qt.rgba(0.0, 0.53, 1.0, 0.12)
+                        border.width: 1
+                        border.color: "#0088ff"
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.margins: Kirigami.Units.smallSpacing
+                            spacing: Kirigami.Units.mediumSpacing
+
+                            PlasmaComponents3.BusyIndicator {
+                                Layout.preferredWidth: 20
+                                Layout.preferredHeight: 20
+                                running: Plasmoid.songRecognizer.listening
+                            }
+
+                            PlasmaComponents3.Label {
+                                Layout.fillWidth: true
+                                text: i18n("Escuchando audio del sistema vía PipeWire…")
+                                color: Kirigami.Theme.textColor
+                                font.weight: Font.Medium
+                            }
+                        }
+                    }
+
+                    // Current Recognized Track Card (Active Result)
+                    Rectangle {
+                        visible: !Plasmoid.songRecognizer.listening && Plasmoid.songRecognizer.title.length > 0 && Plasmoid.songRecognizer.recognizedActive
+                        Layout.fillWidth: true
+                        implicitHeight: activeResultRow.implicitHeight + Kirigami.Units.smallSpacing * 2
+                        radius: Kirigami.Units.smallSpacing
+                        color: Kirigami.Theme.backgroundColor
+                        border.width: 1
+                        border.color: Kirigami.Theme.highlightColor
+
+                        RowLayout {
+                            id: activeResultRow
+                            anchors.fill: parent
+                            anchors.margins: Kirigami.Units.smallSpacing
+                            spacing: Kirigami.Units.mediumSpacing
+
+                            Rectangle {
+                                implicitWidth: 44
+                                implicitHeight: 44
+                                Layout.preferredWidth: 44
+                                Layout.preferredHeight: 44
+                                radius: 6
+                                color: Kirigami.Theme.alternateBackgroundColor
+                                clip: true
+
+                                Image {
+                                    anchors.fill: parent
+                                    visible: Plasmoid.songRecognizer.coverUrl.length > 0 && status === Image.Ready
+                                    source: Plasmoid.songRecognizer.coverUrl
+                                    fillMode: Image.PreserveAspectCrop
+                                    asynchronous: true
+                                }
+                                Kirigami.Icon {
+                                    anchors.centerIn: parent
+                                    width: 24
+                                    height: 24
+                                    visible: Plasmoid.songRecognizer.coverUrl.length === 0
+                                    source: "emblem-music-symbolic"
+                                }
+                            }
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 2
+
+                                PlasmaComponents3.Label {
+                                    Layout.fillWidth: true
+                                    font.bold: true
+                                    elide: Text.ElideRight
+                                    text: Plasmoid.songRecognizer.title
+                                }
+
+                                PlasmaComponents3.Label {
+                                    Layout.fillWidth: true
+                                    opacity: 0.82
+                                    font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                                    elide: Text.ElideRight
+                                    text: Plasmoid.songRecognizer.artist
+                                }
+                            }
+
+                            PlasmaComponents3.ToolButton {
+                                icon.name: "edit-copy"
+                                onClicked: Plasmoid.songRecognizer.copyTrackInfo(Plasmoid.songRecognizer.title + " — " + Plasmoid.songRecognizer.artist)
+                                QQC2.ToolTip.visible: hovered
+                                QQC2.ToolTip.text: i18n("Copiar título y artista")
+                            }
+
+                            PlasmaComponents3.ToolButton {
+                                visible: Plasmoid.songRecognizer.shazamUrl.length > 0
+                                icon.name: "emblem-music-symbolic"
+                                onClicked: Plasmoid.songRecognizer.openInBrowser()
+                                QQC2.ToolTip.visible: hovered
+                                QQC2.ToolTip.text: i18n("Abrir en Shazam")
+                            }
+
+                            PlasmaComponents3.ToolButton {
+                                icon.name: "window-close"
+                                onClicked: Plasmoid.songRecognizer.dismissCurrentResult()
+                                QQC2.ToolTip.visible: hovered
+                                QQC2.ToolTip.text: i18n("Cerrar")
+                            }
+                        }
+                    }
+
+                    // Persistent Shazam History List
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 4
+                        visible: !Plasmoid.songRecognizer.listening && Plasmoid.songRecognizer.history.length > 0
+
                         PlasmaComponents3.Label {
-                            Layout.fillWidth: true
-                            opacity: 0.82
+                            text: i18n("Historial de canciones reconocidas:")
                             font.pixelSize: Kirigami.Theme.smallFont.pixelSize
-                            elide: Text.ElideRight
-                            text: Plasmoid.songRecognizer.title.length > 0
-                                ? Plasmoid.songRecognizer.artist
-                                : (Plasmoid.songRecognizer.status.length > 0
-                                    ? Plasmoid.songRecognizer.status
-                                    : i18n("Identifica lo que suena en tu equipo"))
+                            color: Kirigami.Theme.disabledTextColor
+                            font.bold: true
+                        }
+
+                        Repeater {
+                            model: Plasmoid.songRecognizer.history.slice(0, 5)
+
+                            delegate: Rectangle {
+                                id: historyItemDelegate
+                                required property var modelData
+                                required property int index
+
+                                Layout.fillWidth: true
+                                implicitHeight: 38
+                                radius: 4
+                                color: Kirigami.Theme.backgroundColor
+                                border.width: 1
+                                border.color: Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.10)
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: Kirigami.Units.smallSpacing
+                                    anchors.rightMargin: Kirigami.Units.smallSpacing
+                                    spacing: Kirigami.Units.smallSpacing
+
+                                    Rectangle {
+                                        implicitWidth: 26
+                                        implicitHeight: 26
+                                        radius: 4
+                                        color: Kirigami.Theme.alternateBackgroundColor
+                                        clip: true
+
+                                        Image {
+                                            anchors.fill: parent
+                                            visible: Boolean(historyItemDelegate.modelData.cover && historyItemDelegate.modelData.cover.length > 0)
+                                            source: historyItemDelegate.modelData.cover || ""
+                                            fillMode: Image.PreserveAspectCrop
+                                            asynchronous: true
+                                        }
+
+                                        Kirigami.Icon {
+                                            anchors.centerIn: parent
+                                            width: 16
+                                            height: 16
+                                            visible: !historyItemDelegate.modelData.cover || historyItemDelegate.modelData.cover.length === 0
+                                            source: "emblem-music-symbolic"
+                                        }
+                                    }
+
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 0
+
+                                        PlasmaComponents3.Label {
+                                            Layout.fillWidth: true
+                                            text: historyItemDelegate.modelData.title || ""
+                                            font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                                            font.bold: true
+                                            elide: Text.ElideRight
+                                        }
+
+                                        PlasmaComponents3.Label {
+                                            Layout.fillWidth: true
+                                            text: (historyItemDelegate.modelData.artist || "") + (historyItemDelegate.modelData.timestamp ? " · " + historyItemDelegate.modelData.timestamp : "")
+                                            font.pixelSize: Kirigami.Theme.smallFont.pixelSize - 1
+                                            color: Kirigami.Theme.disabledTextColor
+                                            elide: Text.ElideRight
+                                        }
+                                    }
+
+                                    PlasmaComponents3.ToolButton {
+                                        icon.name: "edit-copy"
+                                        implicitWidth: 26
+                                        implicitHeight: 26
+                                        onClicked: Plasmoid.songRecognizer.copyTrackInfo((historyItemDelegate.modelData.title || "") + " — " + (historyItemDelegate.modelData.artist || ""))
+                                        QQC2.ToolTip.visible: hovered
+                                        QQC2.ToolTip.text: i18n("Copiar")
+                                    }
+
+                                    PlasmaComponents3.ToolButton {
+                                        visible: Boolean(historyItemDelegate.modelData.url && historyItemDelegate.modelData.url.length > 0)
+                                        icon.name: "emblem-music-symbolic"
+                                        implicitWidth: 26
+                                        implicitHeight: 26
+                                        onClicked: Plasmoid.songRecognizer.openUrl(historyItemDelegate.modelData.url)
+                                        QQC2.ToolTip.visible: hovered
+                                        QQC2.ToolTip.text: i18n("Abrir en Shazam")
+                                    }
+                                }
+                            }
                         }
                     }
 
-                    PlasmaComponents3.ToolButton {
-                        visible: Plasmoid.songRecognizer.shazamUrl.length > 0
-                        icon.name: "emblem-music-symbolic"
-                        onClicked: Plasmoid.songRecognizer.openInBrowser()
-                        QQC2.ToolTip.visible: hovered
-                        QQC2.ToolTip.text: i18n("Abrir en Shazam")
-                    }
-
-                    PlasmaComponents3.Button {
-                        icon.name: "audio-headphones-symbolic"
-                        text: Plasmoid.songRecognizer.listening ? i18n("Escuchando…") : i18n("Reconocer")
-                        enabled: !Plasmoid.songRecognizer.listening
-                        onClicked: Plasmoid.songRecognizer.recognize(9)
+                    // Empty State Message (when no history and not listening)
+                    PlasmaComponents3.Label {
+                        visible: !Plasmoid.songRecognizer.listening && Plasmoid.songRecognizer.history.length === 0 && !Plasmoid.songRecognizer.recognizedActive
+                        Layout.fillWidth: true
+                        text: Plasmoid.songRecognizer.status.length > 0
+                            ? Plasmoid.songRecognizer.status
+                            : i18n("Pulsa «Reconocer canción» para identificar cualquier música que suene en tu equipo.")
+                        color: Kirigami.Theme.disabledTextColor
+                        font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                        wrapMode: Text.WordWrap
                     }
                 }
             }

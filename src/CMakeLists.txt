@@ -10,7 +10,13 @@ add_library(kisland_modules STATIC
 )
 set_target_properties(kisland_modules PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(kisland_modules PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(kisland_modules PUBLIC Qt6::Core Qt6::Gui Qt6::Network)
+target_link_libraries(kisland_modules PUBLIC
+    Qt6::Core
+    Qt6::Gui
+    Qt6::Network
+    KF6::I18n
+    KF6::Notifications
+)
 
 plasma_add_applet(org.cesar.kisland
     CPP_SOURCES
