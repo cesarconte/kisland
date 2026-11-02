@@ -39,9 +39,7 @@ PlasmoidItem {
             radius: height / 2
             color: Kirigami.Theme.backgroundColor
             border.width: 1
-            border.color: Plasmoid.mediaPlaying
-                ? Kirigami.Theme.positiveTextColor
-                : (Plasmoid.timerActive ? Kirigami.Theme.neutralTextColor : Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.18))
+            border.color: Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.18)
             clip: true
 
             RowLayout {
@@ -49,10 +47,10 @@ PlasmoidItem {
                 anchors.centerIn: parent
                 spacing: Kirigami.Units.mediumSpacing * 1.15
 
-                // Left side: Album Art / Video Thumbnail dynamically sized inside pill height
+                // Left side: Album Art / Video Thumbnail or Fallback Music Icon in rounded box
                 Rectangle {
                     id: compactArtFrame
-                    visible: Plasmoid.trackArtUrl.length > 0 && !Plasmoid.timerActive
+                    visible: Plasmoid.trackTitle.length > 0 && !Plasmoid.timerActive
                     readonly property int boxSize: Math.max(12, pillCapsule.height - 6)
                     implicitWidth: boxSize
                     implicitHeight: boxSize
@@ -71,26 +69,34 @@ PlasmoidItem {
                         source: Plasmoid.trackArtUrl
                         fillMode: Image.PreserveAspectCrop
                         asynchronous: true
+                        visible: Plasmoid.trackArtUrl.length > 0
+                    }
+
+                    Kirigami.Icon {
+                        anchors.centerIn: parent
+                        width: Math.max(10, parent.width - 4)
+                        height: Math.max(10, parent.height - 4)
+                        source: "audio-x-generic"
+                        color: Kirigami.Theme.highlightColor
+                        visible: Plasmoid.trackArtUrl.length === 0
                     }
                 }
 
-                // Status / Kiri orb dot (when no cover art is shown)
+                // Status / Kiri orb dot (when no track is playing)
                 Rectangle {
-                    visible: Plasmoid.trackArtUrl.length === 0 || Plasmoid.timerActive
+                    visible: Plasmoid.trackTitle.length === 0 || Plasmoid.timerActive
                     implicitWidth: 8
                     implicitHeight: 8
                     Layout.alignment: Qt.AlignVCenter
                     radius: 4
                     color: {
                         if (Plasmoid.kiriState === "listening") return "#00e5ff";
-                        if (Plasmoid.mediaPlaying) return Kirigami.Theme.positiveTextColor;
-                        if (Plasmoid.trackTitle.length > 0) return Kirigami.Theme.neutralTextColor;
                         if (Plasmoid.timerActive) return Kirigami.Theme.neutralTextColor;
                         return Kirigami.Theme.highlightColor;
                     }
                 }
 
-                // Compact label: Clean Media title (without crowded ▶ symbol when cover art is shown), Countdown, or System Vitals
+                // Compact label: Clean Media title (no play icons, matching macOS Dynamic Island), Countdown, or System Vitals
                 PlasmaComponents3.Label {
                     Layout.alignment: Qt.AlignVCenter
                     color: Kirigami.Theme.textColor
@@ -101,11 +107,8 @@ PlasmoidItem {
                             return "⏱  " + Plasmoid.timerRemainingText;
                         }
                         if (Plasmoid.trackTitle.length > 0) {
-                            const prefix = (Plasmoid.trackArtUrl.length === 0)
-                                ? (Plasmoid.mediaPlaying ? "▶  " : "⏸  ")
-                                : (!Plasmoid.mediaPlaying ? "⏸  " : "");
                             const t = Plasmoid.trackTitle;
-                            return prefix + (t.length > 26 ? t.substring(0, 26) + "…" : t);
+                            return t.length > 28 ? t.substring(0, 28) + "…" : t;
                         }
                         return "CPU " + Plasmoid.cpuUsagePercent + "%  ·  RAM " + Plasmoid.ramUsagePercent + "%";
                     }
