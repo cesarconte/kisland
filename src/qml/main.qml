@@ -30,30 +30,19 @@ PlasmoidItem {
             NumberAnimation { duration: 240; easing.type: Easing.OutCubic }
         }
 
-        // Apple Dynamic Island Capsule (Liquid Glass Dark Pill)
+        // Apple Dynamic Island Capsule (Native Breeze Pill)
         Rectangle {
             id: pillCapsule
             anchors.centerIn: parent
             width: parent.width - 6
             height: Math.max(18, Math.min(parent.height - 2, Kirigami.Units.gridUnit * 1.75))
             radius: height / 2
-            color: Qt.rgba(0.06, 0.07, 0.10, 0.94)
+            color: Kirigami.Theme.backgroundColor
             border.width: 1
             border.color: Plasmoid.mediaPlaying
-                ? Qt.rgba(0.0, 0.90, 0.46, 0.48)
-                : (Plasmoid.timerActive ? Qt.rgba(1.0, 0.70, 0.0, 0.60) : Qt.rgba(1.0, 1.0, 1.0, 0.22))
+                ? Kirigami.Theme.positiveTextColor
+                : (Plasmoid.timerActive ? Kirigami.Theme.neutralTextColor : Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.18))
             clip: true
-
-            // Specular top sheen
-            Rectangle {
-                anchors.fill: parent
-                anchors.margins: 1
-                radius: Math.max(0, pillCapsule.radius - 1)
-                gradient: Gradient {
-                    GradientStop { position: 0.0; color: Qt.rgba(1.0, 1.0, 1.0, 0.14) }
-                    GradientStop { position: 0.5; color: Qt.rgba(1.0, 1.0, 1.0, 0.0) }
-                }
-            }
 
             RowLayout {
                 id: pillRow
@@ -71,9 +60,9 @@ PlasmoidItem {
                     Layout.preferredHeight: boxSize
                     Layout.alignment: Qt.AlignVCenter
                     radius: Math.max(3, Math.round(boxSize * 0.24))
-                    color: "#263238"
+                    color: Kirigami.Theme.alternateBackgroundColor
                     border.width: 1
-                    border.color: Qt.rgba(1.0, 1.0, 1.0, 0.30)
+                    border.color: Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.18)
                     clip: true
 
                     Image {
@@ -94,9 +83,9 @@ PlasmoidItem {
                     radius: 4
                     color: {
                         if (Plasmoid.kiriState === "listening") return "#00e5ff";
-                        if (Plasmoid.mediaPlaying) return "#00e676";
-                        if (Plasmoid.trackTitle.length > 0) return "#ffb300";
-                        if (Plasmoid.timerActive) return "#ffb300";
+                        if (Plasmoid.mediaPlaying) return Kirigami.Theme.positiveTextColor;
+                        if (Plasmoid.trackTitle.length > 0) return Kirigami.Theme.neutralTextColor;
+                        if (Plasmoid.timerActive) return Kirigami.Theme.neutralTextColor;
                         return Kirigami.Theme.highlightColor;
                     }
                 }
@@ -104,7 +93,7 @@ PlasmoidItem {
                 // Compact label: Clean Media title (without crowded ▶ symbol when cover art is shown), Countdown, or System Vitals
                 PlasmaComponents3.Label {
                     Layout.alignment: Qt.AlignVCenter
-                    color: "#ffffff"
+                    color: Kirigami.Theme.textColor
                     font.pixelSize: Math.min(Kirigami.Theme.smallFont.pixelSize, Math.max(10, pillCapsule.height - 8))
                     font.weight: Font.Medium
                     text: {
@@ -137,7 +126,7 @@ PlasmoidItem {
                             readonly property real maxBarH: Math.max(8, pillCapsule.height - 8)
                             height: Plasmoid.mediaPlaying ? Math.max(4, Number(modelData) * maxBarH) : 4
                             radius: 1.5
-                            color: Plasmoid.mediaPlaying ? "#00e676" : "#90a4ae"
+                            color: Plasmoid.mediaPlaying ? Kirigami.Theme.highlightColor : Kirigami.Theme.disabledTextColor
                             anchors.verticalCenter: parent.verticalCenter
                             Behavior on height { NumberAnimation { duration: 80 } }
                         }
