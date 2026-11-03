@@ -20,28 +20,71 @@ PlasmoidItem {
     preferredRepresentation: compactRepresentation
     Plasmoid.backgroundHints: PlasmaCore.Types.DefaultBackground
 
+    property string lastSeenTrackKey: ""
+    property bool lastSeenTimerActive: false
+    property bool manualExpanded: false
+
+    onExpandedChanged: {
+        if (!expanded) {
+            autoCollapseTimer.stop();
+            root.manualExpanded = false;
+        }
+    }
+
     Timer {
         id: autoCollapseTimer
         interval: (Plasmoid.configuration.autoCollapseDuration || 4) * 1000
         repeat: false
         onTriggered: {
-            root.expanded = false;
+            if (!root.manualExpanded) {
+                root.expanded = false;
+            }
+        }
+    }
+
+    function checkTrackChange() {
+        if (Plasmoid.configuration.autoExpand === false) return;
+
+        const title = Plasmoid.trackTitle ? Plasmoid.trackTitle.trim() : "";
+        const artist = Plasmoid.trackArtist ? Plasmoid.trackArtist.trim() : "";
+        const currentKey = title + "::" + artist;
+
+        if (title.length === 0) {
+            root.lastSeenTrackKey = "";
+            return;
+        }
+
+        // Only trigger when the actual song title or artist changes
+        if (currentKey !== root.lastSeenTrackKey) {
+            root.lastSeenTrackKey = currentKey;
+            if (Plasmoid.mediaPlaying) {
+                root.manualExpanded = false;
+                root.expanded = true;
+                autoCollapseTimer.restart();
+            }
+        }
+    }
+
+    function checkTimerChange() {
+        if (Plasmoid.configuration.autoExpand === false) return;
+
+        if (Plasmoid.timerActive && !root.lastSeenTimerActive) {
+            root.lastSeenTimerActive = true;
+            root.manualExpanded = false;
+            root.expanded = true;
+            autoCollapseTimer.restart();
+        } else if (!Plasmoid.timerActive) {
+            root.lastSeenTimerActive = false;
         }
     }
 
     Connections {
         target: Plasmoid
-        function onTrackTitleChanged() {
-            if (Plasmoid.configuration.autoExpand !== false && Plasmoid.trackTitle.length > 0 && Plasmoid.mediaPlaying) {
-                root.expanded = true;
-                autoCollapseTimer.restart();
-            }
+        function onMediaStateChanged() {
+            root.checkTrackChange();
         }
-        function onTimerActiveChanged() {
-            if (Plasmoid.configuration.autoExpand !== false && Plasmoid.timerActive) {
-                root.expanded = true;
-                autoCollapseTimer.restart();
-            }
+        function onTimerChanged() {
+            root.checkTimerChange();
         }
     }
 
@@ -212,7 +255,17 @@ PlasmoidItem {
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onClicked: root.expanded = !root.expanded
+                onClicked: {
+                    if (root.expanded) {
+                        autoCollapseTimer.stop();
+                        root.manualExpanded = false;
+                        root.expanded = false;
+                    } else {
+                        autoCollapseTimer.stop();
+                        root.manualExpanded = true;
+                        root.expanded = true;
+                    }
+                }
             }
         }
     }
