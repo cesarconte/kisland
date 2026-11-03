@@ -6,7 +6,39 @@
   <kcfgfile name=""/>
   <group name="General">
     <entry name="autoExpand" type="Bool">
-      <label>Expandir automáticamente con notificaciones de medios</label>
+      <label>Expandir automáticamente la isla con actividades en vivo (cambio de pista o temporizador)</label>
+      <default>true</default>
+    </entry>
+    <entry name="autoCollapseDuration" type="Int">
+      <label>Segundos antes de volver al tamaño de píldora tras auto-expandir</label>
+      <default>4</default>
+    </entry>
+    <entry name="hideWhenIdle" type="Bool">
+      <label>Ocultar la píldora cuando no haya ninguna actividad activa (estilo macOS puro)</label>
+      <default>false</default>
+    </entry>
+    <entry name="showVitalsInCompact" type="Bool">
+      <label>Mostrar telemetría (CPU y RAM) en la píldora cuando esté en reposo</label>
+      <default>true</default>
+    </entry>
+    <entry name="showWaveform" type="Bool">
+      <label>Mostrar onda de espectro de audio animada (PipeWire)</label>
+      <default>true</default>
+    </entry>
+    <entry name="showArtInCompact" type="Bool">
+      <label>Mostrar carátula del álbum en la píldora compacta</label>
+      <default>true</default>
+    </entry>
+    <entry name="showPrivacyDots" type="Bool">
+      <label>Mostrar puntos indicadores de privacidad (micrófono y cámara)</label>
+      <default>true</default>
+    </entry>
+    <entry name="notifyOnRecognized" type="Bool">
+      <label>Enviar notificación de Plasma al reconocer una canción con Shazam</label>
+      <default>true</default>
+    </entry>
+    <entry name="showQuickLaunchers" type="Bool">
+      <label>Mostrar accesos directos rápidos en la isla expandida</label>
       <default>true</default>
     </entry>
   </group>

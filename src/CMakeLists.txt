@@ -23,6 +23,8 @@ plasma_add_applet(org.cesar.kisland
         kislandapplet.cpp
     QML_SOURCES
         qml/main.qml
+        qml/config.qml
+        qml/ConfigGeneral.qml
     RESOURCES
         res/main.xml
 )

@@ -20,9 +20,47 @@ PlasmoidItem {
     preferredRepresentation: compactRepresentation
     Plasmoid.backgroundHints: PlasmaCore.Types.DefaultBackground
 
+    Timer {
+        id: autoCollapseTimer
+        interval: (Plasmoid.configuration.autoCollapseDuration || 4) * 1000
+        repeat: false
+        onTriggered: {
+            root.expanded = false;
+        }
+    }
+
+    Connections {
+        target: Plasmoid
+        function onTrackTitleChanged() {
+            if (Plasmoid.configuration.autoExpand !== false && Plasmoid.trackTitle.length > 0 && Plasmoid.mediaPlaying) {
+                root.expanded = true;
+                autoCollapseTimer.restart();
+            }
+        }
+        function onTimerActiveChanged() {
+            if (Plasmoid.configuration.autoExpand !== false && Plasmoid.timerActive) {
+                root.expanded = true;
+                autoCollapseTimer.restart();
+            }
+        }
+    }
+
     compactRepresentation: Item {
         id: compactPillRoot
-        Layout.minimumWidth: pillRow.implicitWidth + Kirigami.Units.largeSpacing * 3.0
+
+        readonly property bool cfgHideWhenIdle: Plasmoid.configuration.hideWhenIdle === true
+        readonly property bool cfgShowArt: Plasmoid.configuration.showArtInCompact !== false
+        readonly property bool cfgShowWaveform: Plasmoid.configuration.showWaveform !== false
+        readonly property bool cfgShowVitals: Plasmoid.configuration.showVitalsInCompact !== false
+        readonly property bool cfgShowPrivacy: Plasmoid.configuration.showPrivacyDots !== false
+
+        readonly property bool hasActiveIslandActivity: Plasmoid.mediaPlaying || Plasmoid.trackTitle.length > 0 || Plasmoid.timerActive || Plasmoid.micActive || Plasmoid.cameraOrScreenActive || Plasmoid.songRecognizer.listening || Plasmoid.songRecognizer.recognizedActive
+
+        visible: !cfgHideWhenIdle || hasActiveIslandActivity
+        opacity: visible ? 1 : 0
+        Behavior on opacity { NumberAnimation { duration: 200 } }
+
+        Layout.minimumWidth: visible ? (pillRow.implicitWidth + Kirigami.Units.largeSpacing * 3.0) : 0
         Layout.preferredWidth: Layout.minimumWidth
         Layout.fillHeight: true
 
@@ -50,7 +88,7 @@ PlasmoidItem {
                 // Left side: Album Art / Video Thumbnail or Shazam Icon or Fallback Music Icon in rounded box
                 Rectangle {
                     id: compactArtFrame
-                    visible: (Plasmoid.songRecognizer.listening || Plasmoid.songRecognizer.recognizedActive || Plasmoid.trackTitle.length > 0) && !Plasmoid.timerActive
+                    visible: compactPillRoot.cfgShowArt && ((Plasmoid.songRecognizer.listening || Plasmoid.songRecognizer.recognizedActive || Plasmoid.trackTitle.length > 0) && !Plasmoid.timerActive)
                     readonly property int boxSize: Math.max(12, pillCapsule.height - 6)
                     implicitWidth: boxSize
                     implicitHeight: boxSize
@@ -84,7 +122,7 @@ PlasmoidItem {
 
                 // Status / Kiri orb dot (when no track or shazam is active)
                 Rectangle {
-                    visible: (!Plasmoid.songRecognizer.listening && !Plasmoid.songRecognizer.recognizedActive && Plasmoid.trackTitle.length === 0) || Plasmoid.timerActive
+                    visible: (!Plasmoid.songRecognizer.listening && !Plasmoid.songRecognizer.recognizedActive && (!compactPillRoot.cfgShowArt || Plasmoid.trackTitle.length === 0)) || Plasmoid.timerActive
                     implicitWidth: 8
                     implicitHeight: 8
                     Layout.alignment: Qt.AlignVCenter
@@ -117,13 +155,16 @@ PlasmoidItem {
                             const t = Plasmoid.trackTitle;
                             return t.length > 28 ? t.substring(0, 28) + "…" : t;
                         }
-                        return "CPU " + Plasmoid.cpuUsagePercent + "%  ·  RAM " + Plasmoid.ramUsagePercent + "%";
+                        if (compactPillRoot.cfgShowVitals) {
+                            return "CPU " + Plasmoid.cpuUsagePercent + "%  ·  RAM " + Plasmoid.ramUsagePercent + "%";
+                        }
+                        return "";
                     }
                 }
 
                 // Live PipeWire Audio Spectrum Bars when Media Track or Shazam is Present
                 Row {
-                    visible: Plasmoid.trackTitle.length > 0 || Plasmoid.songRecognizer.listening
+                    visible: compactPillRoot.cfgShowWaveform && (Plasmoid.trackTitle.length > 0 || Plasmoid.songRecognizer.listening)
                     spacing: 3
                     Layout.alignment: Qt.AlignVCenter
 
@@ -145,7 +186,7 @@ PlasmoidItem {
 
                 // macOS Dynamic Island Privacy Indicator Dots (Amber = Microphone, Green = Camera/Screen)
                 Row {
-                    visible: Plasmoid.micActive || Plasmoid.cameraOrScreenActive
+                    visible: compactPillRoot.cfgShowPrivacy && (Plasmoid.micActive || Plasmoid.cameraOrScreenActive)
                     spacing: 4
                     Layout.alignment: Qt.AlignVCenter
 
@@ -256,6 +297,7 @@ PlasmoidItem {
                 Item { Layout.fillWidth: true }
 
                 PlasmaComponents3.ToolButton {
+                    visible: Plasmoid.configuration.showQuickLaunchers !== false
                     icon.name: "folder-stash-symbolic"
                     onClicked: Plasmoid.launchDropover()
                     QQC2.ToolTip.visible: hovered
@@ -263,6 +305,7 @@ PlasmoidItem {
                 }
 
                 PlasmaComponents3.ToolButton {
+                    visible: Plasmoid.configuration.showQuickLaunchers !== false
                     icon.name: "view-list-text-symbolic"
                     onClicked: Plasmoid.launchLiveCaptions()
                     QQC2.ToolTip.visible: hovered
