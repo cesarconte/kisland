@@ -20,6 +20,10 @@ PlasmoidItem {
     preferredRepresentation: compactRepresentation
     Plasmoid.backgroundHints: PlasmaCore.Types.DefaultBackground
 
+    property int currentTab: 0 // 0 = Multimedia, 1 = Bandeja (Drop Shelf)
+    property bool pinned: false
+    hideOnWindowDeactivate: !pinned && (currentTab !== 1)
+
     property string lastSeenTrackKey: ""
     property bool lastSeenTimerActive: false
     property bool manualExpanded: false
@@ -54,6 +58,24 @@ PlasmoidItem {
         id: shelfModel
     }
 
+    function extractUrlsFromDrop(drop) {
+        let list = [];
+        if (drop && drop.hasUrls && drop.urls) {
+            for (let i = 0; i < drop.urls.length; ++i) {
+                list.push(drop.urls[i].toString());
+            }
+        } else if (drop && drop.hasText && drop.text) {
+            const lines = drop.text.split("\n");
+            for (let i = 0; i < lines.length; ++i) {
+                const l = lines[i].trim();
+                if (l.length > 0) {
+                    list.push(l);
+                }
+            }
+        }
+        return list;
+    }
+
     function addFileToShelf(urlStr) {
         const clean = urlStr.toString().trim();
         if (clean.length === 0) return;
@@ -68,11 +90,12 @@ PlasmoidItem {
         }
         let icon = "application-x-zerosize";
         const lower = name.toLowerCase();
-        if (lower.match(/\.(png|jpg|jpeg|webp|gif|svg)$/)) icon = "image-x-generic";
+        if (lower.match(/\.(png|jpg|jpeg|webp|gif|svg|bmp)$/)) icon = "image-x-generic";
         else if (lower.match(/\.(mp4|mkv|webm|avi|mov|m4v)$/)) icon = "video-x-generic";
         else if (lower.match(/\.(mp3|flac|wav|ogg|m4a|aac)$/)) icon = "audio-x-generic";
-        else if (lower.match(/\.(pdf|doc|docx|odt|txt|md)$/)) icon = "x-office-document";
-        else if (lower.match(/\.(zip|tar|gz|bz2|xz|7z)$/)) icon = "archive-extract";
+        else if (lower.match(/\.(pdf|doc|docx|odt|txt|md|rtf)$/)) icon = "x-office-document";
+        else if (lower.match(/\.(zip|tar|gz|bz2|xz|7z|rar)$/)) icon = "archive-extract";
+        else if (lower.match(/\.(iso|img)$/)) icon = "media-optical";
 
         shelfModel.append({
             fileName: name,
@@ -94,7 +117,7 @@ PlasmoidItem {
         interval: (Plasmoid.configuration.autoCollapseDuration || 4) * 1000
         repeat: false
         onTriggered: {
-            if (!root.manualExpanded) {
+            if (!root.manualExpanded && !root.pinned && root.currentTab !== 1) {
                 root.expanded = false;
             }
         }
@@ -185,6 +208,10 @@ PlasmoidItem {
             onEntered: (drag) => {
                 pillCapsule.border.color = "#0a84ff";
                 pillCapsule.border.width = 2;
+                // Auto-expand island directly into Drop Shelf on hover/drag
+                root.currentTab = 1;
+                root.manualExpanded = true;
+                root.expanded = true;
             }
             onExited: {
                 pillCapsule.border.color = Qt.rgba(1, 1, 1, 0.15);
@@ -193,15 +220,14 @@ PlasmoidItem {
             onDropped: (drop) => {
                 pillCapsule.border.color = Qt.rgba(1, 1, 1, 0.15);
                 pillCapsule.border.width = 1;
-                if (drop.hasUrls) {
-                    for (let i = 0; i < drop.urls.length; ++i) {
-                        root.addFileToShelf(drop.urls[i]);
-                    }
-                    drop.acceptProposedAction();
-                    expandedIsland.selectedTab = 1;
-                    root.manualExpanded = true;
-                    root.expanded = true;
+                const urls = root.extractUrlsFromDrop(drop);
+                for (let i = 0; i < urls.length; ++i) {
+                    root.addFileToShelf(urls[i]);
                 }
+                drop.acceptProposedAction();
+                root.currentTab = 1;
+                root.manualExpanded = true;
+                root.expanded = true;
             }
         }
 
@@ -438,8 +464,6 @@ PlasmoidItem {
     fullRepresentation: Item {
         id: expandedIsland
 
-        property int selectedTab: 0 // 0 = Multimedia, 1 = Bandeja (Drop Shelf)
-
         readonly property int targetWidth: Math.max(Kirigami.Units.gridUnit * 29, mainColumn.implicitWidth + Kirigami.Units.largeSpacing * 2)
         readonly property int targetHeight: mainColumn.implicitHeight + Kirigami.Units.largeSpacing * 2
 
@@ -566,6 +590,15 @@ PlasmoidItem {
                 Item { Layout.fillWidth: true }
 
                 PlasmaComponents3.ToolButton {
+                    icon.name: root.pinned ? "window-pin" : "window-unpin"
+                    checkable: true
+                    checked: root.pinned
+                    onToggled: root.pinned = checked
+                    QQC2.ToolTip.visible: hovered
+                    QQC2.ToolTip.text: root.pinned ? i18n("Desfijar (cerrar automáticamente al perder el foco)") : i18n("Fijar abierta (mantener abierta incluso al cambiar de ventana)")
+                }
+
+                PlasmaComponents3.ToolButton {
                     visible: Plasmoid.configuration.showQuickLaunchers !== false
                     icon.name: "folder-stash-symbolic"
                     onClicked: Plasmoid.launchDropover()
@@ -595,16 +628,16 @@ PlasmoidItem {
 
                 PlasmaComponents3.Button {
                     text: i18n("🎵 Multimedia")
-                    flat: expandedIsland.selectedTab !== 0
-                    highlighted: expandedIsland.selectedTab === 0
-                    onClicked: expandedIsland.selectedTab = 0
+                    flat: root.currentTab !== 0
+                    highlighted: root.currentTab === 0
+                    onClicked: root.currentTab = 0
                 }
 
                 PlasmaComponents3.Button {
                     text: shelfModel.count > 0 ? i18n("📁 Bandeja (%1)", shelfModel.count) : i18n("📁 Bandeja")
-                    flat: expandedIsland.selectedTab !== 1
-                    highlighted: expandedIsland.selectedTab === 1
-                    onClicked: expandedIsland.selectedTab = 1
+                    flat: root.currentTab !== 1
+                    highlighted: root.currentTab === 1
+                    onClicked: root.currentTab = 1
                 }
 
                 Item { Layout.fillWidth: true }
@@ -613,7 +646,7 @@ PlasmoidItem {
             ColumnLayout {
                 id: multimediaTabCol
                 Layout.fillWidth: true
-                visible: expandedIsland.selectedTab === 0
+                visible: root.currentTab === 0
                 spacing: Kirigami.Units.mediumSpacing
 
                 // 1. Media Player Card (MPRIS2 + Interactive Scrubber + Shuffle/Loop + PipeWire Waveform)
@@ -1343,7 +1376,7 @@ PlasmoidItem {
             ColumnLayout {
                 id: dropShelfTabCol
                 Layout.fillWidth: true
-                visible: expandedIsland.selectedTab === 1
+                visible: root.currentTab === 1
                 spacing: Kirigami.Units.mediumSpacing
 
                 // Shelf Container with DropArea
@@ -1360,13 +1393,22 @@ PlasmoidItem {
                     DropArea {
                         id: shelfDropArea
                         anchors.fill: parent
+                        onEntered: (drag) => {
+                            dropShelfBox.border.color = "#0a84ff";
+                            dropShelfBox.border.width = 2;
+                        }
+                        onExited: {
+                            dropShelfBox.border.color = Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.15);
+                            dropShelfBox.border.width = 1;
+                        }
                         onDropped: (drop) => {
-                            if (drop.hasUrls) {
-                                for (let i = 0; i < drop.urls.length; ++i) {
-                                    root.addFileToShelf(drop.urls[i]);
-                                }
-                                drop.acceptProposedAction();
+                            dropShelfBox.border.color = Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.15);
+                            dropShelfBox.border.width = 1;
+                            const urls = root.extractUrlsFromDrop(drop);
+                            for (let i = 0; i < urls.length; ++i) {
+                                root.addFileToShelf(urls[i]);
                             }
+                            drop.acceptProposedAction();
                         }
                     }
 
@@ -1448,6 +1490,12 @@ PlasmoidItem {
 
                                 Item {
                                     id: shelfItem
+                                    required property int index
+                                    required property string fileName
+                                    required property string fileUrl
+                                    required property string filePath
+                                    required property string fileIcon
+
                                     width: Math.min(220, Math.floor((dropShelfBox.width - Kirigami.Units.mediumSpacing * 2 - Kirigami.Units.smallSpacing) / 2))
                                     height: 54
 
@@ -1456,7 +1504,7 @@ PlasmoidItem {
                                     Drag.hotSpot.x: width / 2
                                     Drag.hotSpot.y: height / 2
                                     Drag.mimeData: {
-                                        "text/uri-list": model.fileUrl + "\r\n"
+                                        "text/uri-list": fileUrl
                                     }
                                     Drag.dragType: Drag.Automatic
 
@@ -1475,7 +1523,7 @@ PlasmoidItem {
                                             Kirigami.Icon {
                                                 implicitWidth: 26
                                                 implicitHeight: 26
-                                                source: model.fileIcon
+                                                source: fileIcon
                                                 Layout.alignment: Qt.AlignVCenter
                                             }
 
@@ -1486,7 +1534,7 @@ PlasmoidItem {
 
                                                 PlasmaComponents3.Label {
                                                     Layout.fillWidth: true
-                                                    text: model.fileName
+                                                    text: fileName
                                                     font.weight: Font.Medium
                                                     font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                                                     elide: Text.ElideMiddle
