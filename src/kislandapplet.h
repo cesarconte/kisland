@@ -50,6 +50,10 @@ class KIslandApplet : public Plasma::Applet
     Q_PROPERTY(QString micApp READ micApp NOTIFY privacyChanged)
     Q_PROPERTY(bool cameraOrScreenActive READ cameraOrScreenActive NOTIFY privacyChanged)
     Q_PROPERTY(QString cameraOrScreenApp READ cameraOrScreenApp NOTIFY privacyChanged)
+    Q_PROPERTY(bool focusActive READ focusActive NOTIFY focusStateChanged)
+    Q_PROPERTY(QString focusModeName READ focusModeName NOTIFY focusStateChanged)
+    Q_PROPERTY(QString focusModeIcon READ focusModeIcon NOTIFY focusStateChanged)
+    Q_PROPERTY(bool focusDndActive READ focusDndActive NOTIFY focusStateChanged)
 
 public:
     explicit KIslandApplet(QObject *parent, const KPluginMetaData &data, const QVariantList &args);
@@ -89,6 +93,10 @@ public:
     QString micApp() const;
     bool cameraOrScreenActive() const;
     QString cameraOrScreenApp() const;
+    bool focusActive() const;
+    QString focusModeName() const;
+    QString focusModeIcon() const;
+    bool focusDndActive() const;
 
     // Q_INVOKABLE Actions
     Q_INVOKABLE void playPauseMedia();
@@ -107,6 +115,9 @@ public:
     Q_INVOKABLE void toggleOutputMute();
     Q_INVOKABLE void launchDropover();
     Q_INVOKABLE void launchLiveCaptions();
+    Q_INVOKABLE QVariantList getKdeConnectDevices() const;
+    Q_INVOKABLE bool shareToKdeConnect(const QString &filePath, const QString &deviceId);
+    Q_INVOKABLE void toggleFocusDnd();
 
     // Static helpers for unit testing
     static QVariantList computeSpectrumBarsFromPcm(const QByteArray &pcmChunk, int barCount = 6);
@@ -124,6 +135,10 @@ Q_SIGNALS:
     void vitalsChanged();
     void audioChanged();
     void privacyChanged();
+    void focusStateChanged();
+    void volumeAlert(int percent, bool muted);
+    void peripheralAlert(const QString &title, const QString &subtitle, const QString &icon);
+    void focusAlert(const QString &title, const QString &icon);
 
 private Q_SLOTS:
     void pollMprisAndActivities();
@@ -135,6 +150,8 @@ private:
     void stopPipeWireSpectrumMonitor();
     void updateSystemVitals();
     void updatePipeWireAudioAndPrivacy();
+    void updateBluetoothAndPeripherals();
+    void updateFocusMode();
 
     bool m_mediaPlaying = false;
     QString m_trackTitle;
@@ -177,6 +194,16 @@ private:
 
     NotificationDigest *m_digest = nullptr;
     SongRecognizer *m_songRecognizer = nullptr;
+
+    bool m_focusActive = false;
+    bool m_focusDndActive = false;
+    QString m_focusModeName;
+    QString m_focusModeIcon;
+    QString m_focusModeId;
+    QSet<QString> m_knownBtDevices;
+    bool m_btInitialized = false;
+    bool m_volumeInitialized = false;
+    bool m_focusInitialized = false;
 
     QTimer *m_pollTimer = nullptr;
     QTimer *m_countdownTimer = nullptr;
