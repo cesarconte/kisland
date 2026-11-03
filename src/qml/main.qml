@@ -30,16 +30,16 @@ PlasmoidItem {
             NumberAnimation { duration: 240; easing.type: Easing.OutCubic }
         }
 
-        // Apple Dynamic Island Capsule (Native Breeze Pill)
+        // Apple Dynamic Island Capsule (macOS / iOS Pitch Black Island)
         Rectangle {
             id: pillCapsule
             anchors.centerIn: parent
             width: parent.width - 6
             height: Math.max(18, Math.min(parent.height - 2, Kirigami.Units.gridUnit * 1.75))
             radius: height / 2
-            color: Kirigami.Theme.backgroundColor
+            color: "#000000"
             border.width: 1
-            border.color: Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.18)
+            border.color: Qt.rgba(1, 1, 1, 0.15)
             clip: true
 
             RowLayout {
@@ -58,9 +58,9 @@ PlasmoidItem {
                     Layout.preferredHeight: boxSize
                     Layout.alignment: Qt.AlignVCenter
                     radius: Math.max(3, Math.round(boxSize * 0.24))
-                    color: Kirigami.Theme.alternateBackgroundColor
+                    color: "#1c1c1e"
                     border.width: 1
-                    border.color: Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.18)
+                    border.color: Qt.rgba(1, 1, 1, 0.12)
                     clip: true
 
                     Image {
@@ -77,7 +77,7 @@ PlasmoidItem {
                         width: Math.max(10, parent.width - 4)
                         height: Math.max(10, parent.height - 4)
                         source: (Plasmoid.songRecognizer.listening || Plasmoid.songRecognizer.recognizedActive) ? "emblem-music-symbolic" : "audio-x-generic"
-                        color: (Plasmoid.songRecognizer.listening || Plasmoid.songRecognizer.recognizedActive) ? "#0088ff" : Kirigami.Theme.highlightColor
+                        color: (Plasmoid.songRecognizer.listening || Plasmoid.songRecognizer.recognizedActive) ? "#0a84ff" : "#ffffff"
                         visible: !Plasmoid.songRecognizer.recognizedActive ? (Plasmoid.trackArtUrl.length === 0 || Plasmoid.songRecognizer.listening) : (Plasmoid.songRecognizer.coverUrl.length === 0)
                     }
                 }
@@ -91,15 +91,15 @@ PlasmoidItem {
                     radius: 4
                     color: {
                         if (Plasmoid.kiriState === "listening") return "#00e5ff";
-                        if (Plasmoid.timerActive) return Kirigami.Theme.neutralTextColor;
-                        return Kirigami.Theme.highlightColor;
+                        if (Plasmoid.timerActive) return "#ff9500";
+                        return "#ffffff";
                     }
                 }
 
                 // Compact label: Clean Media title (no play icons, matching macOS Dynamic Island), Shazam, Countdown, or System Vitals
                 PlasmaComponents3.Label {
                     Layout.alignment: Qt.AlignVCenter
-                    color: Kirigami.Theme.textColor
+                    color: "#ffffff"
                     font.pixelSize: Math.min(Kirigami.Theme.smallFont.pixelSize, Math.max(10, pillCapsule.height - 8))
                     font.weight: Font.Medium
                     text: {
@@ -136,7 +136,7 @@ PlasmoidItem {
                             readonly property real maxBarH: Math.max(8, pillCapsule.height - 8)
                             height: (Plasmoid.mediaPlaying || Plasmoid.songRecognizer.listening) ? Math.max(4, Number(modelData) * maxBarH) : 4
                             radius: 1.5
-                            color: Plasmoid.songRecognizer.listening ? "#0088ff" : (Plasmoid.mediaPlaying ? Kirigami.Theme.highlightColor : Kirigami.Theme.disabledTextColor)
+                            color: Plasmoid.songRecognizer.listening ? "#0a84ff" : (Plasmoid.mediaPlaying ? "#30d158" : Qt.rgba(1, 1, 1, 0.35))
                             anchors.verticalCenter: parent.verticalCenter
                             Behavior on height { NumberAnimation { duration: 80 } }
                         }
@@ -154,7 +154,7 @@ PlasmoidItem {
                         width: 7
                         height: 7
                         radius: 3.5
-                        color: "#ff9100"
+                        color: "#ff9500"
                     }
 
                     Rectangle {
@@ -162,7 +162,7 @@ PlasmoidItem {
                         width: 7
                         height: 7
                         radius: 3.5
-                        color: "#00e676"
+                        color: "#34c759"
                     }
                 }
             }
