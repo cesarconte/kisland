@@ -595,7 +595,7 @@ PlasmoidItem {
                     checked: root.pinned
                     onToggled: root.pinned = checked
                     QQC2.ToolTip.visible: hovered
-                    QQC2.ToolTip.text: root.pinned ? i18n("Desfijar (cerrar automáticamente al perder el foco)") : i18n("Fijar abierta (mantener abierta incluso al cambiar de ventana)")
+                    QQC2.ToolTip.text: root.pinned ? i18n("Desfijar") : i18n("Fijar")
                 }
 
                 PlasmaComponents3.ToolButton {
@@ -603,7 +603,7 @@ PlasmoidItem {
                     icon.name: "folder-stash-symbolic"
                     onClicked: Plasmoid.launchDropover()
                     QQC2.ToolTip.visible: hovered
-                    QQC2.ToolTip.text: i18n("Abrir KDropover (Estantería externa)")
+                    QQC2.ToolTip.text: i18n("Dropover")
                 }
 
                 PlasmaComponents3.ToolButton {
@@ -611,7 +611,7 @@ PlasmoidItem {
                     icon.name: "view-list-text-symbolic"
                     onClicked: Plasmoid.launchLiveCaptions()
                     QQC2.ToolTip.visible: hovered
-                    QQC2.ToolTip.text: i18n("Abrir KLiveCaptions (Subtítulos en vivo)")
+                    QQC2.ToolTip.text: i18n("Subtítulos en vivo")
                 }
 
                 PlasmaComponents3.ToolButton {
@@ -619,7 +619,7 @@ PlasmoidItem {
                     icon.name: "kity-symbolic"
                     onClicked: Plasmoid.invokeKity()
                     QQC2.ToolTip.visible: hovered
-                    QQC2.ToolTip.text: i18n("Abrir Kity (Asistente de IA y voz)")
+                    QQC2.ToolTip.text: i18n("Kity")
                 }
             }
 
@@ -822,7 +822,7 @@ PlasmoidItem {
                             enabled: Plasmoid.trackTitle.length > 0
                             onClicked: Plasmoid.toggleShuffle()
                             QQC2.ToolTip.visible: hovered
-                            QQC2.ToolTip.text: i18n("Aleatorio (Shuffle)")
+                            QQC2.ToolTip.text: i18n("Aleatorio")
                         }
 
                         PlasmaComponents3.ToolButton {
