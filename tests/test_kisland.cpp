@@ -3,7 +3,6 @@
     SPDX-License-Identifier: GPL-3.0-or-later
 */
 
-#include "notificationdigest.h"
 #include "songrecognizer.h"
 
 #include <cmath>
@@ -197,34 +196,6 @@ private Q_SLOTS:
         QCOMPARE(micApp, QStringLiteral("Firefox"));
         QVERIFY(camActive);
         QCOMPARE(camApp, QStringLiteral("obs"));
-    }
-
-    void testNotificationBusctlParsing()
-    {
-        const QByteArray line = R"({"type":"method_call","member":"Notify","payload":{"type":"susssasa{sv}i","data":["Thunderbird",0,"mail","Nuevo correo","Hola Cesar, reunión mañana",[],{},-1]}})";
-        const QVariantMap m = NotificationDigest::parseBusctlNotifyLine(line);
-        QCOMPARE(m.value(QStringLiteral("app")).toString(), QStringLiteral("Thunderbird"));
-        QCOMPARE(m.value(QStringLiteral("summary")).toString(), QStringLiteral("Nuevo correo"));
-        QVERIFY(m.value(QStringLiteral("body")).toString().contains(QStringLiteral("reunión")));
-
-        // Own notifications and garbage are ignored
-        const QByteArray own = R"({"type":"method_call","member":"Notify","payload":{"data":["KIsland",0,"","x","y",[],{},-1]}})";
-        QVERIFY(NotificationDigest::parseBusctlNotifyLine(own).isEmpty());
-        QVERIFY(NotificationDigest::parseBusctlNotifyLine("not json").isEmpty());
-        QVERIFY(NotificationDigest::parseBusctlNotifyLine(R"({"type":"signal"})").isEmpty());
-        QVERIFY(NotificationDigest::isIgnoredApp(QStringLiteral("  kiri ")));
-        QVERIFY(!NotificationDigest::isIgnoredApp(QStringLiteral("Telegram")));
-    }
-
-    void testNotificationDigestPrompt()
-    {
-        QVariantMap a;
-        a[QStringLiteral("app")] = QStringLiteral("Telegram");
-        a[QStringLiteral("summary")] = QStringLiteral("Ana");
-        a[QStringLiteral("body")] = QStringLiteral("¿Comemos?");
-        a[QStringLiteral("time")] = QStringLiteral("14:05");
-        const QString prompt = NotificationDigest::buildDigestPrompt({a});
-        QVERIFY(prompt.contains(QStringLiteral("[14:05] Telegram — Ana: ¿Comemos?")));
     }
 
     void testShazamJsonParsing()

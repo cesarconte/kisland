@@ -11,7 +11,6 @@
 #include <QTimer>
 #include <QVariantList>
 
-class NotificationDigest;
 class SongRecognizer;
 
 class KIslandApplet : public Plasma::Applet
@@ -44,7 +43,6 @@ class KIslandApplet : public Plasma::Applet
     Q_PROPERTY(int outputVolumePercent READ outputVolumePercent NOTIFY audioChanged)
     Q_PROPERTY(bool outputMuted READ outputMuted NOTIFY audioChanged)
     Q_PROPERTY(QString outputDeviceName READ outputDeviceName NOTIFY audioChanged)
-    Q_PROPERTY(QObject *notificationDigest READ notificationDigest CONSTANT)
     Q_PROPERTY(QObject *songRecognizer READ songRecognizer CONSTANT)
     Q_PROPERTY(bool micActive READ micActive NOTIFY privacyChanged)
     Q_PROPERTY(QString micApp READ micApp NOTIFY privacyChanged)
@@ -87,7 +85,6 @@ public:
     int outputVolumePercent() const;
     bool outputMuted() const;
     QString outputDeviceName() const;
-    QObject *notificationDigest() const;
     QObject *songRecognizer() const;
     bool micActive() const;
     QString micApp() const;
@@ -192,7 +189,6 @@ private:
     bool m_cameraOrScreenActive = false;
     QString m_cameraOrScreenApp;
 
-    NotificationDigest *m_digest = nullptr;
     SongRecognizer *m_songRecognizer = nullptr;
 
     bool m_focusActive = false;

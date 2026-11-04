@@ -1,10 +1,8 @@
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 add_definitions(-DTRANSLATION_DOMAIN=\"plasma_applet_org.cesar.kisland\")
 
-# Reusable, unit-testable modules (notification digest, song recognition)
+# Reusable, unit-testable modules (song recognition)
 add_library(kisland_modules STATIC
-    notificationdigest.cpp
-    notificationdigest.h
     songrecognizer.cpp
     songrecognizer.h
 )
