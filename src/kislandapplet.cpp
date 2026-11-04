@@ -99,7 +99,8 @@ double KIslandApplet::timerProgress() const
 }
 QString KIslandApplet::timerRemainingText() const { return m_timerRemainingText; }
 QString KIslandApplet::timerLabel() const { return m_timerLabel; }
-QString KIslandApplet::kiriState() const { return m_kiriState; }
+QString KIslandApplet::kiriState() const { return m_kityState; }
+QString KIslandApplet::kityState() const { return m_kityState; }
 int KIslandApplet::cpuUsagePercent() const { return m_cpuUsagePercent; }
 int KIslandApplet::ramUsagePercent() const { return m_ramUsagePercent; }
 int KIslandApplet::outputVolumePercent() const { return m_outputVolumePercent; }
@@ -301,7 +302,7 @@ QVariantMap KIslandApplet::parseWpctlStatus(const QString &wpctlOutput, const QS
     bool muted = false;
     QString deviceName = QStringLiteral("PipeWire");
     bool micInUse = (kiriState == QStringLiteral("listening"));
-    QString micAppName = micInUse ? QStringLiteral("Kiri") : QString();
+    QString micAppName = micInUse ? QStringLiteral("Kity") : QString();
     bool camInUse = false;
     QString camAppName;
 
@@ -374,7 +375,7 @@ QVariantMap KIslandApplet::parseWpctlStatus(const QString &wpctlOutput, const QS
                     && !isPortName(currentStreamClient)
                     && !(currentStreamClient == QStringLiteral("pw-record") && kiriState != QStringLiteral("listening"))) {
                     micInUse = true;
-                    micAppName = (currentStreamClient == QStringLiteral("pw-record")) ? QStringLiteral("Kiri") : currentStreamClient;
+                    micAppName = (currentStreamClient == QStringLiteral("pw-record")) ? QStringLiteral("Kity") : currentStreamClient;
                 }
             }
         } else if (section == QStringLiteral("Video") && subSection == QStringLiteral("Streams")) {
@@ -405,20 +406,21 @@ void KIslandApplet::pollMprisAndActivities()
 {
     updateSystemVitals();
 
-    // 1. Check Kiri Assistant state via D-Bus
-    QDBusInterface kiriIface(QStringLiteral("org.cesar.kiri"),
-                             QStringLiteral("/Kiri"),
+    // 1. Check Kity Assistant state via D-Bus
+    QDBusInterface kityIface(QStringLiteral("org.cesar.kity"),
+                             QStringLiteral("/Kity"),
                              QStringLiteral("org.freedesktop.DBus.Properties"),
                              QDBusConnection::sessionBus());
-    QString detectedKiri = QStringLiteral("idle");
-    if (kiriIface.isValid()) {
-        const QVariant stProp = kiriIface.property("state");
+    QString detectedKity = QStringLiteral("idle");
+    if (kityIface.isValid()) {
+        const QVariant stProp = kityIface.property("state");
         if (stProp.isValid() && !stProp.toString().isEmpty()) {
-            detectedKiri = stProp.toString();
+            detectedKity = stProp.toString();
         }
     }
-    if (m_kiriState != detectedKiri) {
-        m_kiriState = detectedKiri;
+    if (m_kityState != detectedKity) {
+        m_kityState = detectedKity;
+        Q_EMIT kityStateChanged();
         Q_EMIT kiriStateChanged();
     }
 
@@ -847,13 +849,25 @@ void KIslandApplet::onTimerTick()
     Q_EMIT timerChanged();
 }
 
-void KIslandApplet::invokeKiriVoice()
+void KIslandApplet::invokeKity()
 {
-    QDBusInterface iface(QStringLiteral("org.cesar.kiri"),
-                         QStringLiteral("/Kiri"),
+    QDBusInterface iface(QStringLiteral("org.cesar.kity"),
+                         QStringLiteral("/Kity"),
                          QString(),
                          QDBusConnection::sessionBus());
-    iface.asyncCall(QStringLiteral("toggleRecording"));
+    if (iface.isValid()) {
+        iface.asyncCall(QStringLiteral("toggleUI"));
+    } else {
+        const QString pwBin = QStandardPaths::findExecutable(QStringLiteral("plasmawindowed"));
+        if (!pwBin.isEmpty()) {
+            QProcess::startDetached(pwBin, {QStringLiteral("org.cesar.kity")});
+        }
+    }
+}
+
+void KIslandApplet::invokeKiriVoice()
+{
+    invokeKity();
 }
 
 void KIslandApplet::setOutputVolume(int percent)
@@ -911,7 +925,7 @@ void KIslandApplet::updatePipeWireAudioAndPrivacy()
         return;
     }
 
-    const QVariantMap parsed = parseWpctlStatus(QString::fromUtf8(proc.readAllStandardOutput()), m_kiriState);
+    const QVariantMap parsed = parseWpctlStatus(QString::fromUtf8(proc.readAllStandardOutput()), m_kityState);
     const int newVol = parsed.value(QStringLiteral("volumePercent"), m_outputVolumePercent).toInt();
     const bool newMuted = parsed.value(QStringLiteral("muted"), m_outputMuted).toBool();
     const QString newDev = parsed.value(QStringLiteral("deviceName"), m_outputDeviceName).toString();

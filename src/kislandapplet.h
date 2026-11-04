@@ -38,6 +38,7 @@ class KIslandApplet : public Plasma::Applet
     Q_PROPERTY(QString timerRemainingText READ timerRemainingText NOTIFY timerChanged)
     Q_PROPERTY(QString timerLabel READ timerLabel NOTIFY timerChanged)
     Q_PROPERTY(QString kiriState READ kiriState NOTIFY kiriStateChanged)
+    Q_PROPERTY(QString kityState READ kityState NOTIFY kityStateChanged)
     Q_PROPERTY(int cpuUsagePercent READ cpuUsagePercent NOTIFY vitalsChanged)
     Q_PROPERTY(int ramUsagePercent READ ramUsagePercent NOTIFY vitalsChanged)
     Q_PROPERTY(int outputVolumePercent READ outputVolumePercent NOTIFY audioChanged)
@@ -80,6 +81,7 @@ public:
     QString timerRemainingText() const;
     QString timerLabel() const;
     QString kiriState() const;
+    QString kityState() const;
     int cpuUsagePercent() const;
     int ramUsagePercent() const;
     int outputVolumePercent() const;
@@ -107,6 +109,7 @@ public:
     Q_INVOKABLE void startQuickTimer(int durationSeconds, const QString &label = QStringLiteral("Temporizador"));
     Q_INVOKABLE void togglePauseTimer();
     Q_INVOKABLE void cancelQuickTimer();
+    Q_INVOKABLE void invokeKity();
     Q_INVOKABLE void invokeKiriVoice();
     Q_INVOKABLE void setOutputVolume(int percent);
     Q_INVOKABLE void toggleOutputMute();
@@ -129,6 +132,7 @@ Q_SIGNALS:
     void spectrumChanged();
     void timerChanged();
     void kiriStateChanged();
+    void kityStateChanged();
     void vitalsChanged();
     void audioChanged();
     void privacyChanged();
@@ -175,7 +179,7 @@ private:
     QString m_timerLabel;
     QString m_timerRemainingText;
 
-    QString m_kiriState = QStringLiteral("idle");
+    QString m_kityState = QStringLiteral("idle");
     int m_cpuUsagePercent = 0;
     int m_ramUsagePercent = 0;
     qint64 m_prevCpuTotal = 0;

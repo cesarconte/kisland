@@ -354,7 +354,7 @@ PlasmoidItem {
                     }
                 }
 
-                // Status / Kiri orb dot (when no track or shazam is active)
+                // Status / Kity orb dot (when no track or shazam is active)
                 Rectangle {
                     visible: (!Plasmoid.songRecognizer.listening && !Plasmoid.songRecognizer.recognizedActive && (!compactPillRoot.cfgShowArt || Plasmoid.trackTitle.length === 0)) || Plasmoid.timerActive
                     implicitWidth: 8
@@ -362,7 +362,7 @@ PlasmoidItem {
                     Layout.alignment: Qt.AlignVCenter
                     radius: 4
                     color: {
-                        if (Plasmoid.kiriState === "listening") return "#00e5ff";
+                        if (Plasmoid.kityState === "listening" || Plasmoid.kiriState === "listening") return "#00e5ff";
                         if (Plasmoid.timerActive) return "#ff9500";
                         return "#ffffff";
                     }
@@ -614,10 +614,12 @@ PlasmoidItem {
                     QQC2.ToolTip.text: i18n("Abrir KLiveCaptions (Subtítulos en vivo)")
                 }
 
-                PlasmaComponents3.Button {
-                    icon.name: "audio-input-microphone-symbolic"
-                    text: i18n("Kiri")
-                    onClicked: Plasmoid.invokeKiriVoice()
+                PlasmaComponents3.ToolButton {
+                    visible: Plasmoid.configuration.showQuickLaunchers !== false
+                    icon.name: "kity-symbolic"
+                    onClicked: Plasmoid.invokeKity()
+                    QQC2.ToolTip.visible: hovered
+                    QQC2.ToolTip.text: i18n("Abrir Kity (Asistente de IA y voz)")
                 }
             }
 
