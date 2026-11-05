@@ -1246,7 +1246,7 @@ PlasmoidItem {
                         }
                     }
 
-                    // Selector de tiempo personalizado (Horas, Minutos, Segundos + Etiqueta + Iniciar)
+                    // Selector de tiempo personalizado (Horas, Minutos, Segundos)
                     RowLayout {
                         Layout.fillWidth: true
                         visible: !Plasmoid.timerActive
@@ -1254,36 +1254,43 @@ PlasmoidItem {
 
                         PlasmaComponents3.SpinBox {
                             id: customHoursSpin
-                            Layout.preferredWidth: 68
+                            Layout.fillWidth: true
                             from: 0
                             to: 23
                             value: 0
                             editable: true
-                            textFromValue: function(value) { return value + "h"; }
+                            textFromValue: function(value) { return value + " h"; }
                             valueFromText: function(text) { return parseInt(text) || 0; }
                         }
 
                         PlasmaComponents3.SpinBox {
                             id: customMinsSpin
-                            Layout.preferredWidth: 68
+                            Layout.fillWidth: true
                             from: 0
                             to: 59
                             value: 15
                             editable: true
-                            textFromValue: function(value) { return value + "m"; }
+                            textFromValue: function(value) { return value + " min"; }
                             valueFromText: function(text) { return parseInt(text) || 0; }
                         }
 
                         PlasmaComponents3.SpinBox {
                             id: customSecsSpin
-                            Layout.preferredWidth: 68
+                            Layout.fillWidth: true
                             from: 0
                             to: 59
                             value: 0
                             editable: true
-                            textFromValue: function(value) { return value + "s"; }
+                            textFromValue: function(value) { return value + " s"; }
                             valueFromText: function(text) { return parseInt(text) || 0; }
                         }
+                    }
+
+                    // Fila de Etiqueta e Iniciar
+                    RowLayout {
+                        Layout.fillWidth: true
+                        visible: !Plasmoid.timerActive
+                        spacing: Kirigami.Units.smallSpacing
 
                         PlasmaComponents3.TextField {
                             id: customLabelField
