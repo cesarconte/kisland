@@ -27,14 +27,24 @@ private Q_SLOTS:
     {
         auto fmt = [](qint64 rem) {
             const qint64 clamped = qMax<qint64>(0, rem);
+            const qint64 hours = clamped / 3600;
+            const qint64 mins = (clamped % 3600) / 60;
+            const qint64 secs = clamped % 60;
+            if (hours > 0) {
+                return QStringLiteral("%1:%2:%3")
+                    .arg(hours, 2, 10, QLatin1Char('0'))
+                    .arg(mins, 2, 10, QLatin1Char('0'))
+                    .arg(secs, 2, 10, QLatin1Char('0'));
+            }
             return QStringLiteral("%1:%2")
-                .arg(clamped / 60, 2, 10, QLatin1Char('0'))
-                .arg(clamped % 60, 2, 10, QLatin1Char('0'));
+                .arg(mins, 2, 10, QLatin1Char('0'))
+                .arg(secs, 2, 10, QLatin1Char('0'));
         };
 
         QCOMPARE(fmt(0), QStringLiteral("00:00"));
         QCOMPARE(fmt(65), QStringLiteral("01:05"));
         QCOMPARE(fmt(1500), QStringLiteral("25:00"));
+        QCOMPARE(fmt(3665), QStringLiteral("01:01:05"));
     }
 
     void testSpectrumBarComputation()

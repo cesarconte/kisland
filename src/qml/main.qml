@@ -1245,6 +1245,76 @@ PlasmoidItem {
                             }
                         }
                     }
+
+                    // Selector de tiempo personalizado (Horas, Minutos, Segundos + Etiqueta + Iniciar)
+                    RowLayout {
+                        Layout.fillWidth: true
+                        visible: !Plasmoid.timerActive
+                        spacing: Kirigami.Units.smallSpacing
+
+                        PlasmaComponents3.SpinBox {
+                            id: customHoursSpin
+                            Layout.preferredWidth: 68
+                            from: 0
+                            to: 23
+                            value: 0
+                            editable: true
+                            textFromValue: function(value) { return value + "h"; }
+                            valueFromText: function(text) { return parseInt(text) || 0; }
+                        }
+
+                        PlasmaComponents3.SpinBox {
+                            id: customMinsSpin
+                            Layout.preferredWidth: 68
+                            from: 0
+                            to: 59
+                            value: 15
+                            editable: true
+                            textFromValue: function(value) { return value + "m"; }
+                            valueFromText: function(text) { return parseInt(text) || 0; }
+                        }
+
+                        PlasmaComponents3.SpinBox {
+                            id: customSecsSpin
+                            Layout.preferredWidth: 68
+                            from: 0
+                            to: 59
+                            value: 0
+                            editable: true
+                            textFromValue: function(value) { return value + "s"; }
+                            valueFromText: function(text) { return parseInt(text) || 0; }
+                        }
+
+                        PlasmaComponents3.TextField {
+                            id: customLabelField
+                            Layout.fillWidth: true
+                            placeholderText: i18n("Etiqueta (opcional)")
+                            clearButtonShown: true
+                            onAccepted: startCustomTimerBtn.clicked()
+                        }
+
+                        PlasmaComponents3.Button {
+                            id: startCustomTimerBtn
+                            icon.name: "media-playback-start-symbolic"
+                            text: i18n("Iniciar")
+                            highlighted: true
+                            enabled: (customHoursSpin.value * 3600 + customMinsSpin.value * 60 + customSecsSpin.value) > 0
+                            onClicked: {
+                                const totalSecs = customHoursSpin.value * 3600 + customMinsSpin.value * 60 + customSecsSpin.value;
+                                if (totalSecs > 0) {
+                                    let lbl = customLabelField.text.trim();
+                                    if (lbl.length === 0) {
+                                        let parts = [];
+                                        if (customHoursSpin.value > 0) parts.push(customHoursSpin.value + "h");
+                                        if (customMinsSpin.value > 0) parts.push(customMinsSpin.value + "m");
+                                        if (customSecsSpin.value > 0) parts.push(customSecsSpin.value + "s");
+                                        lbl = parts.join(" ");
+                                    }
+                                    Plasmoid.startQuickTimer(totalSecs, lbl);
+                                }
+                            }
+                        }
+                    }
                 }
             }
             } // Close multimediaTabCol

@@ -149,8 +149,15 @@ QVariantList KIslandApplet::computeSpectrumBarsFromPcm(const QByteArray &pcmChun
 QString KIslandApplet::formatCountdown(qint64 remainingSeconds)
 {
     const qint64 clamped = qMax<qint64>(0, remainingSeconds);
-    const qint64 mins = clamped / 60;
+    const qint64 hours = clamped / 3600;
+    const qint64 mins = (clamped % 3600) / 60;
     const qint64 secs = clamped % 60;
+    if (hours > 0) {
+        return QStringLiteral("%1:%2:%3")
+            .arg(hours, 2, 10, QLatin1Char('0'))
+            .arg(mins, 2, 10, QLatin1Char('0'))
+            .arg(secs, 2, 10, QLatin1Char('0'));
+    }
     return QStringLiteral("%1:%2")
         .arg(mins, 2, 10, QLatin1Char('0'))
         .arg(secs, 2, 10, QLatin1Char('0'));
