@@ -878,61 +878,6 @@ PlasmoidItem {
                 }
             }
 
-            // 2. PipeWire Output Volume & Active Sink Bar (Alcove / Control Center style)
-            Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: volRow.implicitHeight + Kirigami.Units.mediumSpacing * 1.8
-                Layout.preferredHeight: implicitHeight
-                radius: Kirigami.Units.smallSpacing
-                color: Kirigami.Theme.alternateBackgroundColor
-                border.width: 1
-                border.color: Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.15)
-
-                RowLayout {
-                    id: volRow
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    anchors.leftMargin: Kirigami.Units.mediumSpacing
-                    anchors.rightMargin: Kirigami.Units.mediumSpacing
-                    spacing: Kirigami.Units.smallSpacing
-
-                    PlasmaComponents3.ToolButton {
-                        icon.name: Plasmoid.outputMuted ? "audio-volume-muted-symbolic" : "audio-volume-high-symbolic"
-                        onClicked: Plasmoid.toggleOutputMute()
-                        QQC2.ToolTip.visible: hovered
-                        QQC2.ToolTip.text: Plasmoid.outputMuted ? i18n("Reactivar sonido") : i18n("Silenciar salida")
-                    }
-
-                    PlasmaComponents3.Label {
-                        font.pixelSize: Kirigami.Theme.smallFont.pixelSize
-                        font.bold: true
-                        elide: Text.ElideRight
-                        Layout.maximumWidth: Kirigami.Units.gridUnit * 6.5
-                        text: Plasmoid.outputDeviceName
-                    }
-
-                    PlasmaComponents3.Slider {
-                        id: volumeSlider
-                        Layout.fillWidth: true
-                        from: 0
-                        to: 100
-                        stepSize: 1
-                        value: pressed ? value : Plasmoid.outputVolumePercent
-                        onMoved: Plasmoid.setOutputVolume(Math.round(value))
-                    }
-
-                    PlasmaComponents3.Label {
-                        font: Kirigami.Theme.smallFont
-                        color: Kirigami.Theme.textColor
-                        opacity: 0.85
-                        Layout.minimumWidth: 42
-                        horizontalAlignment: Text.AlignRight
-                        text: Plasmoid.outputMuted ? i18n("Mudo") : (Plasmoid.outputVolumePercent + "%")
-                    }
-                }
-            }
-
             // 3. Music Recognition (macOS Shazam integration) — listens to the PipeWire default sink
             Rectangle {
                 Layout.fillWidth: true

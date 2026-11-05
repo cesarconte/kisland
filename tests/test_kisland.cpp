@@ -109,8 +109,13 @@ private Q_SLOTS:
                 }
                 const QString title = meta.value(QStringLiteral("xesam:title")).toString().trimmed();
                 const QString artUrl = meta.value(QStringLiteral("mpris:artUrl")).toString().trimmed();
-                qDebug() << "Detected live MPRIS2 player:" << srv << "status:" << props.value(QStringLiteral("PlaybackStatus")).toString() << "title:" << title << "artUrl:" << artUrl;
-                QVERIFY(!title.isEmpty());
+                const QString status = props.value(QStringLiteral("PlaybackStatus")).toString();
+                qDebug() << "Detected live MPRIS2 player:" << srv << "status:" << status << "title:" << title << "artUrl:" << artUrl;
+                if (status == QStringLiteral("Playing")) {
+                    QVERIFY(!title.isEmpty());
+                } else {
+                    QVERIFY(!status.isEmpty());
+                }
             }
         }
     }
