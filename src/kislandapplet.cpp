@@ -9,6 +9,8 @@
 
 #include <cmath>
 
+#include <KLocalizedString>
+#include <KNotification>
 #include <KPluginFactory>
 
 #include <QCryptographicHash>
@@ -842,7 +844,41 @@ void KIslandApplet::onTimerTick()
     if (!m_timerActive || m_timerPaused) return;
     const qint64 rem = QDateTime::currentDateTime().secsTo(m_timerTarget);
     if (rem <= 0) {
+        const QString finishedLabel = m_timerLabel.isEmpty() ? i18n("Temporizador") : m_timerLabel;
+        const qint64 totalSecs = m_timerTotalSecs;
         cancelQuickTimer();
+
+        // 1. Play official macOS timer/alarm sound via PipeWire
+        const QString alarmSound = QStringLiteral("/home/cesar/.local/share/sounds/macOS-GoldenGate/stereo/alarm-clock-elapsed.oga");
+        if (QFile::exists(alarmSound)) {
+            QProcess::startDetached(QStringLiteral("pw-play"), {alarmSound});
+        }
+
+        // 2. Desktop notification via org.freedesktop.Notifications
+        QDBusMessage msg = QDBusMessage::createMethodCall(
+            QStringLiteral("org.freedesktop.Notifications"),
+            QStringLiteral("/org/freedesktop/Notifications"),
+            QStringLiteral("org.freedesktop.Notifications"),
+            QStringLiteral("Notify")
+        );
+        QVariantMap hints;
+        hints.insert(QStringLiteral("desktop-entry"), QStringLiteral("org.kde.plasmashell"));
+        hints.insert(QStringLiteral("category"), QStringLiteral("timer"));
+        hints.insert(QStringLiteral("urgency"), uchar(2)); // High urgency
+
+        msg << QStringLiteral("KIsland")
+            << 0u
+            << QStringLiteral("chronometer")
+            << i18n("¡Se acabó el tiempo!")
+            << finishedLabel
+            << QStringList()
+            << hints
+            << -1;
+
+        QDBusConnection::sessionBus().asyncCall(msg);
+
+        // 3. Emit timerFinished signal so QML Dynamic Island shows amber HUD alert
+        Q_EMIT timerFinished(finishedLabel, totalSecs);
         return;
     }
     m_timerRemainingText = formatCountdown(rem);

@@ -37,7 +37,7 @@ PlasmoidItem {
 
     Timer {
         id: pillHudTimer
-        interval: root.pillHudType === "volume" ? 1800 : 2800
+        interval: root.pillHudType === "timer_done" ? 5000 : (root.pillHudType === "volume" ? 1800 : 2800)
         repeat: false
         onTriggered: {
             root.pillHudType = "";
@@ -167,6 +167,9 @@ PlasmoidItem {
         function onTimerChanged() {
             root.checkTimerChange();
         }
+        function onTimerFinished(label, totalSecs) {
+            root.showHud("timer_done", i18n("¡Se acabó el tiempo!"), label, "chronometer", 100);
+        }
         function onVolumeAlert(percent, muted) {
             const volIcon = muted ? "audio-volume-muted" : (percent > 66 ? "audio-volume-high" : (percent > 33 ? "audio-volume-medium" : "audio-volume-low"));
             root.showHud("volume", muted ? i18n("Silenciado") : (percent + "%"), "", volIcon, percent);
@@ -239,11 +242,11 @@ PlasmoidItem {
             height: Math.max(18, Math.min(parent.height - 2, Kirigami.Units.gridUnit * 1.75))
             radius: height / 2
             color: "#000000"
-            border.width: 1
-            border.color: Qt.rgba(1, 1, 1, 0.15)
+            border.width: root.pillHudType === "timer_done" ? 2 : 1
+            border.color: root.pillHudType === "timer_done" ? "#ff9f0a" : Qt.rgba(1, 1, 1, 0.15)
             clip: true
 
-            // Transient Dynamic HUD Row (Volume, Bluetooth Peripherals, Focus/DND, AirDrop)
+            // Transient Dynamic HUD Row (Volume, Bluetooth Peripherals, Focus/DND, AirDrop, Timer Done)
             RowLayout {
                 id: hudRow
                 anchors.centerIn: parent
@@ -257,7 +260,7 @@ PlasmoidItem {
                     Layout.preferredHeight: 14
                     Layout.alignment: Qt.AlignVCenter
                     source: root.hudIcon
-                    color: root.pillHudType === "focus" ? "#ff9f0a" : (root.pillHudType === "volume" ? "#ffffff" : "#30d158")
+                    color: (root.pillHudType === "timer_done" || root.pillHudType === "focus") ? "#ff9f0a" : (root.pillHudType === "volume" ? "#ffffff" : "#30d158")
                 }
 
                 RowLayout {
@@ -296,9 +299,9 @@ PlasmoidItem {
                     Layout.alignment: Qt.AlignVCenter
 
                     PlasmaComponents3.Label {
-                        color: "#ffffff"
+                        color: root.pillHudType === "timer_done" ? "#ff9f0a" : "#ffffff"
                         font.pixelSize: Math.min(Kirigami.Theme.smallFont.pixelSize, Math.max(10, pillCapsule.height - 8))
-                        font.weight: Font.Medium
+                        font.weight: Font.DemiBold
                         text: root.hudTitle
                         elide: Text.ElideRight
                         Layout.maximumWidth: 180

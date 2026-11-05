@@ -131,6 +131,7 @@ Q_SIGNALS:
     void mediaStateChanged();
     void spectrumChanged();
     void timerChanged();
+    void timerFinished(const QString &label, qint64 totalSecs);
     void kiriStateChanged();
     void kityStateChanged();
     void vitalsChanged();
