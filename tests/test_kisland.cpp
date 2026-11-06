@@ -232,6 +232,23 @@ private Q_SLOTS:
         QQmlComponent comp(&engine, QUrl::fromLocalFile(qmlPath));
         QVERIFY2(!comp.isError(), qPrintable(comp.errorString()));
     }
+
+    void testMainQmlLayoutConstraintsAndAirDropNaming()
+    {
+        const QString qmlPath = QStringLiteral(KISLAND_SOURCE_DIR) + QStringLiteral("/src/qml/main.qml");
+        QFile f(qmlPath);
+        QVERIFY(f.open(QIODevice::ReadOnly | QIODevice::Text));
+        const QString qml = QString::fromUtf8(f.readAll());
+
+        // Enforce tight Layout bounds to avoid wasted empty space
+        QVERIFY(qml.contains(QStringLiteral("Layout.maximumHeight: targetHeight")));
+        QVERIFY(qml.contains(QStringLiteral("Layout.maximumWidth: targetWidth")));
+
+        // Enforce pure macOS Golden Gate AirDrop naming without hybrid parentheses
+        QVERIFY(!qml.contains(QStringLiteral("AirDrop (KDE Connect)")));
+        QVERIFY(!qml.contains(QStringLiteral("AirDrop / KDE Connect")));
+        QVERIFY(qml.contains(QStringLiteral("text: i18n(\"AirDrop\")")));
+    }
 };
 
 QTEST_MAIN(TestKIsland)

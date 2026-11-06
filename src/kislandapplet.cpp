@@ -22,6 +22,7 @@
 #include <QDBusObjectPath>
 #include <QDBusReply>
 #include <QDBusVariant>
+#include <QDesktopServices>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -1149,6 +1150,37 @@ bool KIslandApplet::shareToKdeConnect(const QString &filePath, const QString &de
     }
 
     return QProcess::startDetached(kdecli, args);
+}
+
+void KIslandApplet::openAirDropSettings()
+{
+    const QString app = QStandardPaths::findExecutable(QStringLiteral("kdeconnect-app"));
+    if (!app.isEmpty()) {
+        QProcess::startDetached(app, {});
+    }
+}
+
+void KIslandApplet::openFileLocation(const QString &filePath)
+{
+    QString cleanPath = filePath;
+    if (cleanPath.startsWith(QStringLiteral("file://"))) {
+        cleanPath = QUrl(cleanPath).toLocalFile();
+    }
+    if (cleanPath.isEmpty()) {
+        return;
+    }
+
+    const QFileInfo fi(cleanPath);
+    if (!fi.exists()) {
+        return;
+    }
+
+    const QString dolphin = QStandardPaths::findExecutable(QStringLiteral("dolphin"));
+    if (!dolphin.isEmpty()) {
+        QProcess::startDetached(dolphin, {QStringLiteral("--select"), fi.absoluteFilePath()});
+    } else {
+        QDesktopServices::openUrl(QUrl::fromLocalFile(fi.absolutePath()));
+    }
 }
 
 void KIslandApplet::toggleFocusDnd()

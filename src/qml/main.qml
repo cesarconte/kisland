@@ -472,9 +472,13 @@ PlasmoidItem {
 
         implicitWidth: targetWidth
         implicitHeight: targetHeight
+        width: targetWidth
+        height: targetHeight
         Layout.minimumWidth: targetWidth
-        Layout.minimumHeight: targetHeight
+        Layout.maximumWidth: targetWidth
         Layout.preferredWidth: targetWidth
+        Layout.minimumHeight: targetHeight
+        Layout.maximumHeight: targetHeight
         Layout.preferredHeight: targetHeight
 
         ColumnLayout {
@@ -1427,7 +1431,7 @@ PlasmoidItem {
                                     Layout.alignment: Qt.AlignHCenter
                                     font: Kirigami.Theme.smallFont
                                     opacity: 0.5
-                                    text: i18n("Retén archivos para moverlos entre aplicaciones o enviarlos por AirDrop / KDE Connect")
+                                    text: i18n("Retén archivos para moverlos entre aplicaciones o compartirlos por AirDrop")
                                 }
                             }
                         }
@@ -1502,10 +1506,21 @@ PlasmoidItem {
                                             }
 
                                             PlasmaComponents3.ToolButton {
+                                                icon.name: "document-open-folder"
+                                                Layout.preferredWidth: 22
+                                                Layout.preferredHeight: 22
+                                                onClicked: Plasmoid.openFileLocation(shelfItem.filePath)
+                                                QQC2.ToolTip.visible: hovered
+                                                QQC2.ToolTip.text: i18n("Mostrar en gestor de archivos")
+                                            }
+
+                                            PlasmaComponents3.ToolButton {
                                                 icon.name: "edit-delete-remove"
                                                 Layout.preferredWidth: 22
                                                 Layout.preferredHeight: 22
                                                 onClicked: shelfModel.remove(index)
+                                                QQC2.ToolTip.visible: hovered
+                                                QQC2.ToolTip.text: i18n("Quitar de la bandeja")
                                             }
                                         }
 
@@ -1524,7 +1539,7 @@ PlasmoidItem {
                     }
                 }
 
-                // AirDrop / KDE Connect Device Sharing Section
+                // AirDrop Device Sharing Section (macOS Golden Gate parity)
                 Rectangle {
                     id: airdropCard
                     Layout.fillWidth: true
@@ -1543,7 +1558,7 @@ PlasmoidItem {
 
                     Timer {
                         interval: 4000
-                        running: expandedIsland.selectedTab === 1
+                        running: root.currentTab === 1
                         repeat: true
                         onTriggered: {
                             airdropCard.kdeDevices = Plasmoid.getKdeConnectDevices();
@@ -1570,7 +1585,7 @@ PlasmoidItem {
 
                             Kirigami.Heading {
                                 level: 5
-                                text: i18n("AirDrop (KDE Connect)")
+                                text: i18n("AirDrop")
                             }
 
                             Item { Layout.fillWidth: true }
@@ -1578,7 +1593,20 @@ PlasmoidItem {
                             PlasmaComponents3.Label {
                                 font: Kirigami.Theme.smallFont
                                 opacity: 0.6
-                                text: airdropCard.kdeDevices.length > 0 ? i18n("%1 dispositivo(s) accesible(s)", airdropCard.kdeDevices.length) : i18n("Sin dispositivos vinculados activos")
+                                text: airdropCard.kdeDevices.length > 0
+                                    ? (airdropCard.kdeDevices.length === 1
+                                        ? i18n("1 dispositivo disponible")
+                                        : i18n("%1 dispositivos disponibles", airdropCard.kdeDevices.length))
+                                    : i18n("Sin dispositivos disponibles")
+                            }
+
+                            PlasmaComponents3.ToolButton {
+                                icon.name: "settings-configure"
+                                implicitWidth: 24
+                                implicitHeight: 24
+                                onClicked: Plasmoid.openAirDropSettings()
+                                QQC2.ToolTip.visible: hovered
+                                QQC2.ToolTip.text: i18n("Configurar AirDrop")
                             }
                         }
 
@@ -1613,7 +1641,7 @@ PlasmoidItem {
                             font: Kirigami.Theme.smallFont
                             opacity: 0.7
                             wrapMode: Text.WordWrap
-                            text: i18n("Vincula tu teléfono o tablet con KDE Connect para enviar archivos con un clic estilo AirDrop.")
+                            text: i18n("Vincula tu teléfono o tableta con AirDrop para transferir archivos al instante con un solo clic.")
                         }
                     }
                 }

@@ -117,6 +117,8 @@ public:
     Q_INVOKABLE void launchLiveCaptions();
     Q_INVOKABLE QVariantList getKdeConnectDevices() const;
     Q_INVOKABLE bool shareToKdeConnect(const QString &filePath, const QString &deviceId);
+    Q_INVOKABLE void openAirDropSettings();
+    Q_INVOKABLE void openFileLocation(const QString &filePath);
     Q_INVOKABLE void toggleFocusDnd();
 
     // Static helpers for unit testing
