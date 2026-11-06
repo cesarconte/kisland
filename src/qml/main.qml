@@ -1431,7 +1431,7 @@ PlasmoidItem {
                                     Layout.alignment: Qt.AlignHCenter
                                     font: Kirigami.Theme.smallFont
                                     opacity: 0.5
-                                    text: i18n("Retén archivos para moverlos entre aplicaciones o compartirlos por AirDrop")
+                                    text: i18n("Retén archivos para moverlos entre aplicaciones o enviarlos con KDE Connect")
                                 }
                             }
                         }
@@ -1539,7 +1539,7 @@ PlasmoidItem {
                     }
                 }
 
-                // AirDrop Device Sharing Section (macOS Golden Gate parity)
+                // KDE Connect Device Sharing Section (native KDE Plasma integration)
                 Rectangle {
                     id: airdropCard
                     Layout.fillWidth: true
@@ -1585,7 +1585,7 @@ PlasmoidItem {
 
                             Kirigami.Heading {
                                 level: 5
-                                text: i18n("AirDrop")
+                                text: i18n("KDE Connect")
                             }
 
                             Item { Layout.fillWidth: true }
@@ -1604,9 +1604,9 @@ PlasmoidItem {
                                 icon.name: "settings-configure"
                                 implicitWidth: 24
                                 implicitHeight: 24
-                                onClicked: Plasmoid.openAirDropSettings()
+                                onClicked: Plasmoid.openKdeConnectSettings()
                                 QQC2.ToolTip.visible: hovered
-                                QQC2.ToolTip.text: i18n("Configurar AirDrop")
+                                QQC2.ToolTip.text: i18n("Configurar KDE Connect")
                             }
                         }
 
@@ -1641,7 +1641,7 @@ PlasmoidItem {
                             font: Kirigami.Theme.smallFont
                             opacity: 0.7
                             wrapMode: Text.WordWrap
-                            text: i18n("Vincula tu teléfono o tableta con AirDrop para transferir archivos al instante con un solo clic.")
+                            text: i18n("Vincula tu teléfono o tableta con KDE Connect para transferir archivos al instante con un solo clic.")
                         }
                     }
                 }

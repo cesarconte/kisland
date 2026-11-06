@@ -233,7 +233,7 @@ private Q_SLOTS:
         QVERIFY2(!comp.isError(), qPrintable(comp.errorString()));
     }
 
-    void testMainQmlLayoutConstraintsAndAirDropNaming()
+    void testMainQmlLayoutConstraintsAndKdeConnectNaming()
     {
         const QString qmlPath = QStringLiteral(KISLAND_SOURCE_DIR) + QStringLiteral("/src/qml/main.qml");
         QFile f(qmlPath);
@@ -244,10 +244,10 @@ private Q_SLOTS:
         QVERIFY(qml.contains(QStringLiteral("Layout.maximumHeight: targetHeight")));
         QVERIFY(qml.contains(QStringLiteral("Layout.maximumWidth: targetWidth")));
 
-        // Enforce pure macOS Golden Gate AirDrop naming without hybrid parentheses
+        // Enforce native KDE Connect naming without hybrid parentheses
         QVERIFY(!qml.contains(QStringLiteral("AirDrop (KDE Connect)")));
         QVERIFY(!qml.contains(QStringLiteral("AirDrop / KDE Connect")));
-        QVERIFY(qml.contains(QStringLiteral("text: i18n(\"AirDrop\")")));
+        QVERIFY(qml.contains(QStringLiteral("text: i18n(\"KDE Connect\")")));
     }
 };
 

@@ -1152,7 +1152,7 @@ bool KIslandApplet::shareToKdeConnect(const QString &filePath, const QString &de
     return QProcess::startDetached(kdecli, args);
 }
 
-void KIslandApplet::openAirDropSettings()
+void KIslandApplet::openKdeConnectSettings()
 {
     const QString app = QStandardPaths::findExecutable(QStringLiteral("kdeconnect-app"));
     if (!app.isEmpty()) {
