@@ -894,17 +894,18 @@ void KIslandApplet::onTimerTick()
 
 void KIslandApplet::invokeKity()
 {
+    const QString kityBin = QStandardPaths::findExecutable(QStringLiteral("kity"));
+    if (!kityBin.isEmpty()) {
+        QProcess::startDetached(kityBin, QStringList() << QStringLiteral("-t"));
+        return;
+    }
+
     QDBusInterface iface(QStringLiteral("org.cesar.kity"),
                          QStringLiteral("/Kity"),
                          QString(),
                          QDBusConnection::sessionBus());
     if (iface.isValid()) {
         iface.asyncCall(QStringLiteral("toggleUI"));
-    } else {
-        const QString pwBin = QStandardPaths::findExecutable(QStringLiteral("plasmawindowed"));
-        if (!pwBin.isEmpty()) {
-            QProcess::startDetached(pwBin, {QStringLiteral("org.cesar.kity")});
-        }
     }
 }
 
