@@ -9,6 +9,7 @@
 
 #include <cmath>
 
+#include <KIO/CommandLauncherJob>
 #include <KLocalizedString>
 #include <KNotification>
 #include <KPluginFactory>
@@ -56,6 +57,17 @@ void KIslandApplet::init()
     m_pollTimer->start(1800);
 
     connect(m_countdownTimer, &QTimer::timeout, this, &KIslandApplet::onTimerTick);
+
+    if (m_songRecognizer) {
+        connect(m_songRecognizer, &SongRecognizer::stateChanged, this, [this]() {
+            const bool shouldMonitor = m_mediaPlaying || (m_songRecognizer && m_songRecognizer->listening());
+            if (shouldMonitor) {
+                startPipeWireSpectrumMonitor();
+            } else {
+                stopPipeWireSpectrumMonitor();
+            }
+        });
+    }
 
     pollMprisAndActivities();
 }
@@ -124,25 +136,89 @@ QVariantList KIslandApplet::computeSpectrumBarsFromPcm(const QByteArray &pcmChun
     QVariantList result;
     if (barCount <= 0) return result;
 
-    const int totalSamples = pcmChunk.size() / static_cast<int>(sizeof(qint16));
-    if (totalSamples < barCount) {
+    constexpr int totalSamples = 256;
+    if (pcmChunk.size() < totalSamples * static_cast<int>(sizeof(qint16))) {
         for (int i = 0; i < barCount; ++i) result.append(0.15);
         return result;
     }
 
     const qint16 *samples = reinterpret_cast<const qint16 *>(pcmChunk.constData());
-    const int samplesPerBar = totalSamples / barCount;
+    std::array<double, totalSamples> re;
+    std::array<double, totalSamples> im;
+    im.fill(0.0);
+
+    for (int i = 0; i < totalSamples; ++i) {
+        re[i] = samples[i] / 32768.0;
+    }
+
+    // Bit-reversal permutation
+    int j = 0;
+    for (int i = 0; i < totalSamples - 1; ++i) {
+        if (i < j) {
+            std::swap(re[i], re[j]);
+        }
+        int k = totalSamples >> 1;
+        while (k <= j) {
+            j -= k;
+            k >>= 1;
+        }
+        j += k;
+    }
+
+    // Cooley-Tukey Radix-2 FFT
+    int step = 2;
+    while (step <= totalSamples) {
+        const int half = step >> 1;
+        const double angle = -2.0 * M_PI / step;
+        const double w_re = std::cos(angle);
+        const double w_im = std::sin(angle);
+        for (int i = 0; i < totalSamples; i += step) {
+            double u_re = 1.0;
+            double u_im = 0.0;
+            for (int m = 0; m < half; ++m) {
+                const int pos = i + m;
+                const double t_re = u_re * re[pos + half] - u_im * im[pos + half];
+                const double t_im = u_re * im[pos + half] + u_im * re[pos + half];
+                re[pos + half] = re[pos] - t_re;
+                im[pos + half] = im[pos] - t_im;
+                re[pos] += t_re;
+                im[pos] += t_im;
+                const double next_u_re = u_re * w_re - u_im * w_im;
+                u_im = u_re * w_im + u_im * w_re;
+                u_re = next_u_re;
+            }
+        }
+        step <<= 1;
+    }
+
+    // 6 log-distributed musical frequency bands spanning 60 Hz to 4000 Hz
+    // Band 0: Sub/Bass (~62 - 187 Hz)
+    // Band 1: Low Mids (~218 - 468 Hz)
+    // Band 2: Mids (~500 - 968 Hz)
+    // Band 3: High Mids (~1000 - 1968 Hz)
+    // Band 4: Presence (~2000 - 2968 Hz)
+    // Band 5: Treble (~3000 - 3968 Hz)
+    static const std::array<std::pair<int, int>, 6> bands = {{
+        {2, 6}, {7, 15}, {16, 31}, {32, 63}, {64, 95}, {96, 127}
+    }};
 
     for (int b = 0; b < barCount; ++b) {
-        double sumSq = 0.0;
-        const int offset = b * samplesPerBar;
-        for (int i = 0; i < samplesPerBar; ++i) {
-            const double norm = samples[offset + i] / 32768.0;
-            sumSq += norm * norm;
+        int k_start = 2;
+        int k_end = 127;
+        if (b < static_cast<int>(bands.size())) {
+            k_start = bands[b].first;
+            k_end = bands[b].second;
         }
-        const double rms = std::sqrt(sumSq / samplesPerBar);
-        const double barHeight = qBound(0.15, rms * 5.2, 1.0);
-        result.append(barHeight);
+
+        double sum_mag = 0.0;
+        for (int k = k_start; k <= k_end; ++k) {
+            sum_mag += std::sqrt(re[k] * re[k] + im[k] * im[k]);
+        }
+        const double avg_mag = sum_mag / ((k_end - k_start + 1) * (totalSamples / 2.0));
+        const double weight = 1.0 + 1.5 * (static_cast<double>(b) / std::max(1, barCount - 1));
+        const double energy = avg_mag * weight;
+        const double scaled = 0.15 + 0.85 * std::min(1.0, std::sqrt(energy) * 3.2);
+        result.append(scaled);
     }
     return result;
 }
@@ -577,7 +653,8 @@ void KIslandApplet::pollMprisAndActivities()
     m_shuffleEnabled = newShuffle;
     m_loopStatus = newLoop;
 
-    if (m_mediaPlaying) {
+    const bool shouldMonitorAudio = m_mediaPlaying || (m_songRecognizer && m_songRecognizer->listening());
+    if (shouldMonitorAudio) {
         startPipeWireSpectrumMonitor();
     } else {
         stopPipeWireSpectrumMonitor();
@@ -590,26 +667,40 @@ void KIslandApplet::pollMprisAndActivities()
 
 void KIslandApplet::startPipeWireSpectrumMonitor()
 {
-    if (m_pwMonitorProc && m_pwMonitorProc->state() != QProcess::NotRunning) {
-        return;
+    if (m_pwMonitorProc) {
+        if (m_pwMonitorProc->state() != QProcess::NotRunning) {
+            return;
+        }
+        m_pwMonitorProc->deleteLater();
+        m_pwMonitorProc = nullptr;
     }
 
     const QString pwRecord = QStandardPaths::findExecutable(QStringLiteral("pw-record"));
-    if (pwRecord.isEmpty()) return;
+    const QString parec = QStandardPaths::findExecutable(QStringLiteral("parec"));
+    if (pwRecord.isEmpty() && parec.isEmpty()) return;
 
     m_pwMonitorProc = new QProcess(this);
     connect(m_pwMonitorProc, &QProcess::readyReadStandardOutput, this, &KIslandApplet::onPipeWireAudioChunk);
 
-    // Capture PipeWire default output sink monitor (respecting EasyEffects DSP chain)
-    QStringList args;
-    args << QStringLiteral("--raw")
-         << QStringLiteral("--format=s16")
-         << QStringLiteral("--rate=8000")
-         << QStringLiteral("--channels=1")
-         << QStringLiteral("-P") << QStringLiteral("stream.capture.sink=true")
-         << QStringLiteral("-");
-
-    m_pwMonitorProc->start(pwRecord, args);
+    if (!pwRecord.isEmpty()) {
+        // Native PipeWire output sink monitor capture (respects EasyEffects chain)
+        QStringList args;
+        args << QStringLiteral("--raw")
+             << QStringLiteral("--format=s16")
+             << QStringLiteral("--rate=8000")
+             << QStringLiteral("--channels=1")
+             << QStringLiteral("-P") << QStringLiteral("{\"target.object\":\"@DEFAULT_SINK@\",\"stream.capture.sink\":true}")
+             << QStringLiteral("-");
+        m_pwMonitorProc->start(pwRecord, args);
+    } else {
+        // Fallback to parec for PulseAudio / PipeWire-Pulse compatibility
+        QStringList args;
+        args << QStringLiteral("-d") << QStringLiteral("@DEFAULT_MONITOR@")
+             << QStringLiteral("--rate=8000")
+             << QStringLiteral("--channels=1")
+             << QStringLiteral("--format=s16le");
+        m_pwMonitorProc->start(parec, args);
+    }
 }
 
 void KIslandApplet::stopPipeWireSpectrumMonitor()
@@ -625,7 +716,8 @@ void KIslandApplet::stopPipeWireSpectrumMonitor()
         m_pwMonitorProc->deleteLater();
         m_pwMonitorProc = nullptr;
     }
-    m_spectrumBars = {0.15, 0.25, 0.20, 0.30, 0.18, 0.15};
+    m_audioPcmBuffer.clear();
+    m_spectrumBars = {0.15, 0.15, 0.15, 0.15, 0.15, 0.15};
     Q_EMIT spectrumChanged();
 }
 
@@ -633,8 +725,18 @@ void KIslandApplet::onPipeWireAudioChunk()
 {
     if (!m_pwMonitorProc) return;
     const QByteArray chunk = m_pwMonitorProc->readAllStandardOutput();
-    if (chunk.size() >= 256) {
-        m_spectrumBars = computeSpectrumBarsFromPcm(chunk.right(512), 6);
+    if (chunk.isEmpty()) return;
+
+    m_audioPcmBuffer.append(chunk);
+
+    // 256 samples of 16-bit PCM = 512 bytes (32ms of audio at 8000 Hz)
+    constexpr int CHUNK_BYTES = 512;
+    if (m_audioPcmBuffer.size() >= CHUNK_BYTES) {
+        const QByteArray latestChunk = m_audioPcmBuffer.right(CHUNK_BYTES);
+        if (m_audioPcmBuffer.size() > 1024) {
+            m_audioPcmBuffer = m_audioPcmBuffer.right(CHUNK_BYTES);
+        }
+        m_spectrumBars = computeSpectrumBarsFromPcm(latestChunk, 6);
         Q_EMIT spectrumChanged();
     }
 }
@@ -895,19 +997,21 @@ void KIslandApplet::onTimerTick()
 
 void KIslandApplet::invokeKity()
 {
-    const QString kityBin = QStandardPaths::findExecutable(QStringLiteral("kity"));
-    if (!kityBin.isEmpty()) {
-        QProcess::startDetached(kityBin, QStringList() << QStringLiteral("-t"));
+    const QString kityBin = QStandardPaths::findExecutable(QStringLiteral("kity"),
+                                                           {QDir::homePath() + QStringLiteral("/.local/bin"),
+                                                            QStringLiteral("/usr/local/bin"),
+                                                            QStringLiteral("/usr/bin")});
+    if (kityBin.isEmpty()) {
+        qWarning() << "KIsland: kity executable not found";
         return;
     }
 
-    QDBusInterface iface(QStringLiteral("org.cesar.kity"),
-                         QStringLiteral("/Kity"),
-                         QString(),
-                         QDBusConnection::sessionBus());
-    if (iface.isValid()) {
-        iface.asyncCall(QStringLiteral("toggleUI"));
-    }
+    // Launch through KIO so that, on Wayland, an XDG activation token is requested
+    // and forwarded (via KDBusService) to the already running Kity instance.
+    // Without it KWin's focus-stealing prevention keeps the window behind others.
+    auto *job = new KIO::CommandLauncherJob(kityBin, {QStringLiteral("-t")});
+    job->setDesktopName(QStringLiteral("org.cesar.kity"));
+    job->start();
 }
 
 void KIslandApplet::invokeKiriVoice()

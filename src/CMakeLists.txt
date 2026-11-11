@@ -40,6 +40,7 @@ target_link_libraries(org.cesar.kisland PRIVATE
     KF6::CoreAddons
     KF6::I18n
     KF6::Notifications
+    KF6::KIOGui
     Plasma::Plasma
     Plasma::PlasmaQuick
 )
