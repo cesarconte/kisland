@@ -211,7 +211,7 @@ void SongRecognizer::recognize(int seconds)
     m_rec = new QProcess(this);
     // Capture default sink monitor via PipeWire (respects EasyEffects chain; no hw:* devices)
     m_rec->start(pwRecord, {QStringLiteral("--rate=44100"), QStringLiteral("--channels=1"), QStringLiteral("--format=s16"),
-                            QStringLiteral("-P"), QStringLiteral("stream.capture.sink=true"), m_wavPath});
+                            QStringLiteral("-P"), QStringLiteral("{\"target.object\":\"@DEFAULT_SINK@\",\"stream.capture.sink\":true}"), m_wavPath});
     setStatus(i18n("Escuchando música…"), true);
     m_stopTimer.start(qBound(4, seconds, 20) * 1000);
 }

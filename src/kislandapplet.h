@@ -171,8 +171,9 @@ private:
     bool m_shuffleEnabled = false;
     QString m_loopStatus = QStringLiteral("None");
 
-    QVariantList m_spectrumBars = {0.15, 0.25, 0.20, 0.30, 0.18, 0.15};
+    QVariantList m_spectrumBars = {0.15, 0.15, 0.15, 0.15, 0.15, 0.15};
     QProcess *m_pwMonitorProc = nullptr;
+    QByteArray m_audioPcmBuffer;
 
     bool m_timerActive = false;
     bool m_timerPaused = false;

@@ -495,7 +495,7 @@ PlasmoidItem {
                 Layout.fillWidth: true
                 spacing: CachyTheme.spacingSmall
 
-                Kirigami.Heading {
+                CachyHeading {
                     level: 4
                     text: i18n("🏝️ KIsland")
                 }
@@ -597,37 +597,33 @@ PlasmoidItem {
 
                 Item { Layout.fillWidth: true }
 
-                PlasmaComponents3.ToolButton {
-                    icon.name: root.pinned ? "window-pin" : "window-unpin"
+                CachyToolbarButton {
+                    iconName: root.pinned ? "window-pin" : "window-unpin"
                     checkable: true
                     checked: root.pinned
-                    onToggled: root.pinned = checked
-                    QQC2.ToolTip.visible: hovered
-                    QQC2.ToolTip.text: root.pinned ? i18n("Desfijar") : i18n("Fijar")
+                    onToggled: (next) => { root.pinned = next }
+                    tooltipText: root.pinned ? i18n("Desfijar") : i18n("Fijar")
                 }
 
-                PlasmaComponents3.ToolButton {
+                CachyToolbarButton {
                     visible: Plasmoid.configuration.showQuickLaunchers !== false
-                    icon.name: "folder-stash-symbolic"
+                    iconName: "folder-stash-symbolic"
                     onClicked: Plasmoid.launchDropover()
-                    QQC2.ToolTip.visible: hovered
-                    QQC2.ToolTip.text: i18n("Dropover")
+                    tooltipText: i18n("Dropover")
                 }
 
-                PlasmaComponents3.ToolButton {
+                CachyToolbarButton {
                     visible: Plasmoid.configuration.showQuickLaunchers !== false
-                    icon.name: "view-list-text-symbolic"
+                    iconName: "view-list-text-symbolic"
                     onClicked: Plasmoid.launchLiveCaptions()
-                    QQC2.ToolTip.visible: hovered
-                    QQC2.ToolTip.text: i18n("Subtítulos en vivo")
+                    tooltipText: i18n("Subtítulos en vivo")
                 }
 
-                PlasmaComponents3.ToolButton {
+                CachyToolbarButton {
                     visible: Plasmoid.configuration.showQuickLaunchers !== false
-                    icon.name: "kity-symbolic"
+                    iconName: "kity-symbolic"
                     onClicked: Plasmoid.invokeKity()
-                    QQC2.ToolTip.visible: hovered
-                    QQC2.ToolTip.text: i18n("Kity")
+                    tooltipText: i18n("Kity")
                 }
             }
 
@@ -636,17 +632,17 @@ PlasmoidItem {
                 Layout.fillWidth: true
                 spacing: CachyTheme.spacingSmall
 
-                PlasmaComponents3.Button {
+                CachyButton {
                     text: i18n("🎵 Multimedia")
                     flat: root.currentTab !== 0
-                    highlighted: root.currentTab === 0
+                    primary: root.currentTab === 0
                     onClicked: root.currentTab = 0
                 }
 
-                PlasmaComponents3.Button {
+                CachyButton {
                     text: shelfModel.count > 0 ? i18n("📁 Bandeja (%1)", shelfModel.count) : i18n("📁 Bandeja")
                     flat: root.currentTab !== 1
-                    highlighted: root.currentTab === 1
+                    primary: root.currentTab === 1
                     onClicked: root.currentTab = 1
                 }
 
@@ -798,7 +794,7 @@ PlasmoidItem {
                             text: Plasmoid.trackElapsedText
                         }
 
-                        PlasmaComponents3.Slider {
+                        CachySlider {
                             id: trackScrubber
                             Layout.fillWidth: true
                             from: 0.0
@@ -823,64 +819,60 @@ PlasmoidItem {
                         Layout.alignment: Qt.AlignHCenter
                         spacing: CachyTheme.spacingMedium
 
-                        PlasmaComponents3.ToolButton {
-                            icon.name: "media-playlist-shuffle-symbolic"
+                        CachyToolbarButton {
+                            iconName: "media-playlist-shuffle-symbolic"
                             checkable: true
                             checked: Plasmoid.shuffleEnabled
                             enabled: Plasmoid.trackTitle.length > 0
                             onClicked: Plasmoid.toggleShuffle()
-                            QQC2.ToolTip.visible: hovered
-                            QQC2.ToolTip.text: i18n("Aleatorio")
+                                    tooltipText: i18n("Aleatorio")
                         }
 
-                        PlasmaComponents3.ToolButton {
-                            icon.name: "media-seek-backward-symbolic"
+                        CachyToolbarButton {
+                            iconName: "media-seek-backward-symbolic"
                             enabled: Plasmoid.trackTitle.length > 0
                             onClicked: Plasmoid.skipBySeconds(-10)
-                            QQC2.ToolTip.visible: hovered
-                            QQC2.ToolTip.text: i18n("Retroceder 10 s")
+                                    tooltipText: i18n("Retroceder 10 s")
                         }
 
-                        PlasmaComponents3.ToolButton {
-                            icon.name: "media-skip-backward-symbolic"
+                        CachyToolbarButton {
+                            iconName: "media-skip-backward-symbolic"
                             implicitWidth: Kirigami.Units.gridUnit * 2.0
                             implicitHeight: Kirigami.Units.gridUnit * 2.0
                             enabled: Plasmoid.trackTitle.length > 0
                             onClicked: Plasmoid.previousTrack()
                         }
 
-                        PlasmaComponents3.ToolButton {
-                            icon.name: Plasmoid.mediaPlaying ? "media-playback-pause-symbolic" : "media-playback-start-symbolic"
+                        CachyToolbarButton {
+                            iconName: Plasmoid.mediaPlaying ? "media-playback-pause-symbolic" : "media-playback-start-symbolic"
                             implicitWidth: Kirigami.Units.gridUnit * 2.3
                             implicitHeight: Kirigami.Units.gridUnit * 2.3
                             enabled: Plasmoid.trackTitle.length > 0
                             onClicked: Plasmoid.playPauseMedia()
                         }
 
-                        PlasmaComponents3.ToolButton {
-                            icon.name: "media-skip-forward-symbolic"
+                        CachyToolbarButton {
+                            iconName: "media-skip-forward-symbolic"
                             implicitWidth: Kirigami.Units.gridUnit * 2.0
                             implicitHeight: Kirigami.Units.gridUnit * 2.0
                             enabled: Plasmoid.trackTitle.length > 0
                             onClicked: Plasmoid.nextTrack()
                         }
 
-                        PlasmaComponents3.ToolButton {
-                            icon.name: "media-seek-forward-symbolic"
+                        CachyToolbarButton {
+                            iconName: "media-seek-forward-symbolic"
                             enabled: Plasmoid.trackTitle.length > 0
                             onClicked: Plasmoid.skipBySeconds(10)
-                            QQC2.ToolTip.visible: hovered
-                            QQC2.ToolTip.text: i18n("Avanzar 10 s")
+                                    tooltipText: i18n("Avanzar 10 s")
                         }
 
-                        PlasmaComponents3.ToolButton {
-                            icon.name: "media-playlist-repeat-symbolic"
+                        CachyToolbarButton {
+                            iconName: "media-playlist-repeat-symbolic"
                             checkable: true
                             checked: Plasmoid.loopStatus !== "None"
                             enabled: Plasmoid.trackTitle.length > 0
                             onClicked: Plasmoid.cycleLoopStatus()
-                            QQC2.ToolTip.visible: hovered
-                            QQC2.ToolTip.text: i18n("Bucle: %1", Plasmoid.loopStatus)
+                                    tooltipText: i18n("Bucle: %1", Plasmoid.loopStatus)
                         }
                     }
                 }
@@ -922,24 +914,23 @@ PlasmoidItem {
                             text: i18n("Reconocimiento de música (Shazam)")
                         }
 
-                        PlasmaComponents3.ToolButton {
+                        CachyToolbarButton {
                             visible: Plasmoid.songRecognizer.history.length > 0
-                            icon.name: "edit-clear-history"
+                            iconName: "edit-clear-history"
                             onClicked: Plasmoid.songRecognizer.clearHistory()
-                            QQC2.ToolTip.visible: hovered
-                            QQC2.ToolTip.text: i18n("Limpiar historial de Shazam")
+                                    tooltipText: i18n("Limpiar historial de Shazam")
                         }
 
-                        PlasmaComponents3.Button {
+                        CachyButton {
                             visible: !Plasmoid.songRecognizer.listening
-                            icon.name: "audio-headphones-symbolic"
+                            iconName: "audio-headphones-symbolic"
                             text: i18n("Reconocer canción")
                             onClicked: Plasmoid.songRecognizer.recognize(9)
                         }
 
-                        PlasmaComponents3.Button {
+                        CachyButton {
                             visible: Plasmoid.songRecognizer.listening
-                            icon.name: "process-stop-symbolic"
+                            iconName: "process-stop-symbolic"
                             text: i18n("Cancelar")
                             onClicked: Plasmoid.songRecognizer.cancel()
                         }
@@ -1038,26 +1029,23 @@ PlasmoidItem {
                                 }
                             }
 
-                            PlasmaComponents3.ToolButton {
-                                icon.name: "edit-copy"
+                            CachyToolbarButton {
+                                iconName: "edit-copy"
                                 onClicked: Plasmoid.songRecognizer.copyTrackInfo(Plasmoid.songRecognizer.title + " — " + Plasmoid.songRecognizer.artist)
-                                QQC2.ToolTip.visible: hovered
-                                QQC2.ToolTip.text: i18n("Copiar título y artista")
+                                            tooltipText: i18n("Copiar título y artista")
                             }
 
-                            PlasmaComponents3.ToolButton {
+                            CachyToolbarButton {
                                 visible: Plasmoid.songRecognizer.shazamUrl.length > 0
-                                icon.name: "emblem-music-symbolic"
+                                iconName: "emblem-music-symbolic"
                                 onClicked: Plasmoid.songRecognizer.openInBrowser()
-                                QQC2.ToolTip.visible: hovered
-                                QQC2.ToolTip.text: i18n("Abrir en Shazam")
+                                            tooltipText: i18n("Abrir en Shazam")
                             }
 
-                            PlasmaComponents3.ToolButton {
-                                icon.name: "window-close"
+                            CachyToolbarButton {
+                                iconName: "window-close"
                                 onClicked: Plasmoid.songRecognizer.dismissCurrentResult()
-                                QQC2.ToolTip.visible: hovered
-                                QQC2.ToolTip.text: i18n("Cerrar")
+                                            tooltipText: i18n("Cerrar")
                             }
                         }
                     }
@@ -1141,23 +1129,21 @@ PlasmoidItem {
                                         }
                                     }
 
-                                    PlasmaComponents3.ToolButton {
-                                        icon.name: "edit-copy"
+                                    CachyToolbarButton {
+                                        iconName: "edit-copy"
                                         implicitWidth: 26
                                         implicitHeight: 26
                                         onClicked: Plasmoid.songRecognizer.copyTrackInfo((historyItemDelegate.modelData.title || "") + " — " + (historyItemDelegate.modelData.artist || ""))
-                                        QQC2.ToolTip.visible: hovered
-                                        QQC2.ToolTip.text: i18n("Copiar")
+                                                            tooltipText: i18n("Copiar")
                                     }
 
-                                    PlasmaComponents3.ToolButton {
+                                    CachyToolbarButton {
                                         visible: Boolean(historyItemDelegate.modelData.url && historyItemDelegate.modelData.url.length > 0)
-                                        icon.name: "emblem-music-symbolic"
+                                        iconName: "emblem-music-symbolic"
                                         implicitWidth: 26
                                         implicitHeight: 26
                                         onClicked: Plasmoid.songRecognizer.openUrl(historyItemDelegate.modelData.url)
-                                        QQC2.ToolTip.visible: hovered
-                                        QQC2.ToolTip.text: i18n("Abrir en Shazam")
+                                                            tooltipText: i18n("Abrir en Shazam")
                                     }
                                 }
                             }
@@ -1206,15 +1192,15 @@ PlasmoidItem {
                                 ? i18n("⏱  %1: %2", Plasmoid.timerLabel, Plasmoid.timerRemainingText)
                                 : i18n("⏱  Temporizadores Rápidos (Live Activity)")
                         }
-                        PlasmaComponents3.Button {
+                        CachyButton {
                             visible: Plasmoid.timerActive
-                            icon.name: Plasmoid.timerPaused ? "media-playback-start-symbolic" : "media-playback-pause-symbolic"
+                            iconName: Plasmoid.timerPaused ? "media-playback-start-symbolic" : "media-playback-pause-symbolic"
                             text: Plasmoid.timerPaused ? i18n("Reanudar") : i18n("Pausar")
                             onClicked: Plasmoid.togglePauseTimer()
                         }
-                        PlasmaComponents3.Button {
+                        CachyButton {
                             visible: Plasmoid.timerActive
-                            icon.name: "process-stop-symbolic"
+                            iconName: "process-stop-symbolic"
                             text: i18n("Cancelar")
                             onClicked: Plasmoid.cancelQuickTimer()
                         }
@@ -1241,7 +1227,7 @@ PlasmoidItem {
                                 { secs: 600, label: "10 min" },
                                 { secs: 1500, label: "🍅 Pomodoro (25m)" }
                             ]
-                            PlasmaComponents3.Button {
+                            CachyButton {
                                 required property var modelData
                                 Layout.fillWidth: true
                                 text: modelData.label
@@ -1305,11 +1291,11 @@ PlasmoidItem {
                             onAccepted: startCustomTimerBtn.clicked()
                         }
 
-                        PlasmaComponents3.Button {
+                        CachyButton {
                             id: startCustomTimerBtn
-                            icon.name: "media-playback-start-symbolic"
+                            iconName: "media-playback-start-symbolic"
                             text: i18n("Iniciar")
-                            highlighted: true
+                            primary: true
                             enabled: (customHoursSpin.value * 3600 + customMinsSpin.value * 60 + customSecsSpin.value) > 0
                             onClicked: {
                                 const totalSecs = customHoursSpin.value * 3600 + customMinsSpin.value * 60 + customSecsSpin.value;
@@ -1383,16 +1369,16 @@ PlasmoidItem {
                             Layout.fillWidth: true
                             spacing: CachyTheme.spacingSmall
 
-                            Kirigami.Heading {
+                            CachyHeading {
                                 level: 5
                                 text: i18n("Bandeja de Archivos (Drop Shelf)")
                             }
 
                             Item { Layout.fillWidth: true }
 
-                            PlasmaComponents3.Button {
+                            CachyButton {
                                 visible: shelfModel.count > 0
-                                icon.name: "edit-clear-all"
+                                iconName: "edit-clear-all"
                                 text: i18n("Vaciar")
                                 flat: true
                                 onClicked: shelfModel.clear()
@@ -1506,22 +1492,20 @@ PlasmoidItem {
                                                 }
                                             }
 
-                                            PlasmaComponents3.ToolButton {
-                                                icon.name: "document-open-folder"
+                                            CachyToolbarButton {
+                                                iconName: "document-open-folder"
                                                 Layout.preferredWidth: 22
                                                 Layout.preferredHeight: 22
                                                 onClicked: Plasmoid.openFileLocation(shelfItem.filePath)
-                                                QQC2.ToolTip.visible: hovered
-                                                QQC2.ToolTip.text: i18n("Mostrar en gestor de archivos")
+                                                                            tooltipText: i18n("Mostrar en gestor de archivos")
                                             }
 
-                                            PlasmaComponents3.ToolButton {
-                                                icon.name: "edit-delete-remove"
+                                            CachyToolbarButton {
+                                                iconName: "edit-delete-remove"
                                                 Layout.preferredWidth: 22
                                                 Layout.preferredHeight: 22
                                                 onClicked: shelfModel.remove(index)
-                                                QQC2.ToolTip.visible: hovered
-                                                QQC2.ToolTip.text: i18n("Quitar de la bandeja")
+                                                                            tooltipText: i18n("Quitar de la bandeja")
                                             }
                                         }
 
@@ -1584,7 +1568,7 @@ PlasmoidItem {
                                 source: "kdeconnect"
                             }
 
-                            Kirigami.Heading {
+                            CachyHeading {
                                 level: 5
                                 text: i18n("KDE Connect")
                             }
@@ -1601,13 +1585,12 @@ PlasmoidItem {
                                     : i18n("Sin dispositivos disponibles")
                             }
 
-                            PlasmaComponents3.ToolButton {
-                                icon.name: "settings-configure"
+                            CachyToolbarButton {
+                                iconName: "settings-configure"
                                 implicitWidth: 24
                                 implicitHeight: 24
                                 onClicked: Plasmoid.openKdeConnectSettings()
-                                QQC2.ToolTip.visible: hovered
-                                QQC2.ToolTip.text: i18n("Configurar KDE Connect")
+                                            tooltipText: i18n("Configurar KDE Connect")
                             }
                         }
 
@@ -1620,9 +1603,9 @@ PlasmoidItem {
                             Repeater {
                                 model: airdropCard.kdeDevices
 
-                                PlasmaComponents3.Button {
+                                CachyButton {
                                     required property var modelData
-                                    icon.name: "smartphone"
+                                    iconName: "smartphone"
                                     text: i18n("Enviar a %1", modelData.name)
                                     enabled: shelfModel.count > 0
                                     onClicked: {

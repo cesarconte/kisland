@@ -5,6 +5,7 @@
 
 #include "songrecognizer.h"
 
+#include <algorithm>
 #include <cmath>
 #include <QDBusArgument>
 #include <QDBusConnection>
@@ -50,24 +51,108 @@ private Q_SLOTS:
     void testSpectrumBarComputation()
     {
         const int barCount = 6;
-        QByteArray pcm(600 * sizeof(qint16), 0);
-        qint16 *samples = reinterpret_cast<qint16 *>(pcm.data());
-        for (int i = 0; i < 600; ++i) {
-            samples[i] = 6000;
+        constexpr int totalSamples = 256;
+
+        auto computeBars = [=](const QByteArray &pcmChunk) {
+            QVariantList result;
+            if (pcmChunk.size() < totalSamples * static_cast<int>(sizeof(qint16))) {
+                for (int i = 0; i < barCount; ++i) result.append(0.15);
+                return result;
+            }
+            const qint16 *samples = reinterpret_cast<const qint16 *>(pcmChunk.constData());
+            std::array<double, totalSamples> re;
+            std::array<double, totalSamples> im;
+            im.fill(0.0);
+            for (int i = 0; i < totalSamples; ++i) {
+                re[i] = samples[i] / 32768.0;
+            }
+
+            int j = 0;
+            for (int i = 0; i < totalSamples - 1; ++i) {
+                if (i < j) std::swap(re[i], re[j]);
+                int k = totalSamples >> 1;
+                while (k <= j) { j -= k; k >>= 1; }
+                j += k;
+            }
+
+            int step = 2;
+            while (step <= totalSamples) {
+                const int half = step >> 1;
+                const double angle = -2.0 * M_PI / step;
+                const double w_re = std::cos(angle);
+                const double w_im = std::sin(angle);
+                for (int i = 0; i < totalSamples; i += step) {
+                    double u_re = 1.0;
+                    double u_im = 0.0;
+                    for (int m = 0; m < half; ++m) {
+                        const int pos = i + m;
+                        const double t_re = u_re * re[pos + half] - u_im * im[pos + half];
+                        const double t_im = u_re * im[pos + half] + u_im * re[pos + half];
+                        re[pos + half] = re[pos] - t_re;
+                        im[pos + half] = im[pos] - t_im;
+                        re[pos] += t_re;
+                        im[pos] += t_im;
+                        const double next_u_re = u_re * w_re - u_im * w_im;
+                        u_im = u_re * w_im + u_im * w_re;
+                        u_re = next_u_re;
+                    }
+                }
+                step <<= 1;
+            }
+
+            static const std::array<std::pair<int, int>, 6> bands = {{
+                {2, 6}, {7, 15}, {16, 31}, {32, 63}, {64, 95}, {96, 127}
+            }};
+
+            for (int b = 0; b < barCount; ++b) {
+                int k_start = 2;
+                int k_end = 127;
+                if (b < static_cast<int>(bands.size())) {
+                    k_start = bands[b].first;
+                    k_end = bands[b].second;
+                }
+                double sum_mag = 0.0;
+                for (int k = k_start; k <= k_end; ++k) {
+                    sum_mag += std::sqrt(re[k] * re[k] + im[k] * im[k]);
+                }
+                const double avg_mag = sum_mag / ((k_end - k_start + 1) * (totalSamples / 2.0));
+                const double weight = 1.0 + 1.5 * (static_cast<double>(b) / std::max(1, barCount - 1));
+                const double energy = avg_mag * weight;
+                const double scaled = 0.15 + 0.85 * std::min(1.0, std::sqrt(energy) * 3.2);
+                result.append(scaled);
+            }
+            return result;
+        };
+
+        // 1. Silent PCM
+        QByteArray silentPcm(totalSamples * sizeof(qint16), 0);
+        const QVariantList silentBars = computeBars(silentPcm);
+        QCOMPARE(silentBars.size(), barCount);
+        for (const QVariant &b : silentBars) {
+            QCOMPARE(b.toDouble(), 0.15);
         }
 
-        const int totalSamples = pcm.size() / static_cast<int>(sizeof(qint16));
-        const int samplesPerBar = totalSamples / barCount;
-        QCOMPARE(samplesPerBar, 100);
-
-        double sumSq = 0.0;
-        for (int i = 0; i < samplesPerBar; ++i) {
-            const double norm = samples[i] / 32768.0;
-            sumSq += norm * norm;
+        // 2. Tone PCM (1000 Hz)
+        QByteArray tonePcm(totalSamples * sizeof(qint16), 0);
+        qint16 *samples = reinterpret_cast<qint16 *>(tonePcm.data());
+        for (int i = 0; i < totalSamples; ++i) {
+            samples[i] = static_cast<qint16>(16000.0 * std::sin(2.0 * M_PI * 1000.0 * i / 8000.0));
         }
-        const double rms = std::sqrt(sumSq / samplesPerBar);
-        const double height = qBound(0.15, rms * 5.2, 1.0);
-        QVERIFY(height > 0.8 && height <= 1.0);
+        const QVariantList toneBars = computeBars(tonePcm);
+        QCOMPARE(toneBars.size(), barCount);
+        for (const QVariant &b : toneBars) {
+            QVERIFY(b.toDouble() >= 0.15 && b.toDouble() <= 1.0);
+        }
+        // Band 3 (1000-2000Hz, bin 32) should be stimulated significantly
+        QVERIFY(toneBars.at(3).toDouble() > 0.4);
+
+        // 3. Small chunk fallback
+        QByteArray smallPcm(10, 0);
+        const QVariantList smallBars = computeBars(smallPcm);
+        QCOMPARE(smallBars.size(), barCount);
+        for (const QVariant &b : smallBars) {
+            QCOMPARE(b.toDouble(), 0.15);
+        }
     }
 
     void testIslandMetadataExists()
