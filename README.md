@@ -1,6 +1,6 @@
 # KIsland 🏝️
 
-> **Dynamic Island & Live Activities al estilo Apple para el panel de KDE Plasma 6.8 sobre Wayland en CachyOS Linux.**
+> **Dynamic Island & Live Activities para el panel de KDE Plasma 6 sobre Wayland en CachyOS Linux.**
 
 KIsland transforma el centro del panel superior de KDE Plasma 6 en una **Píldora Dinámica interactiva** con estética **Liquid Glass**:
 - **MPRIS2 Media & Live Waveform (PipeWire)**: Detecta automáticamente cualquier reproductor multimedia en reproducción (Spotify, Elisa, Firefox, VLC), muestra título/artista y renderiza un visualizador de onda reactivo en tiempo real capturando el monitor del sumidero por defecto de PipeWire (`stream.capture.sink=true`, respetando EasyEffects).

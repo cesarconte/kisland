@@ -49,7 +49,7 @@ KCM.SimpleKCM {
         QQC2.CheckBox {
             id: hideWhenIdleCheck
             Kirigami.FormData.label: i18n("Visibilidad:")
-            text: i18n("Ocultar la píldora en el panel cuando no haya actividad (estilo macOS)")
+            text: i18n("Ocultar la píldora en el panel cuando no haya actividad")
         }
 
         // --- SECCIÓN: ELEMENTOS DE LA PÍLDORA ---

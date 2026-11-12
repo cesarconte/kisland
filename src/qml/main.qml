@@ -10,6 +10,7 @@ import QtQuick.Controls as QQC2
 import QtQuick.Layouts
 
 import org.kde.kirigami as Kirigami
+import CachyOS.UI
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.plasmoid
@@ -28,7 +29,7 @@ PlasmoidItem {
     property bool lastSeenTimerActive: false
     property bool manualExpanded: false
 
-    // Transient Apple Dynamic Island HUD state
+    // Transient Dynamic Island HUD state
     property string pillHudType: "" // "volume", "peripheral", "focus", "airdrop"
     property string hudTitle: ""
     property string hudSubtitle: ""
@@ -197,7 +198,7 @@ PlasmoidItem {
         opacity: visible ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: 200 } }
 
-        Layout.minimumWidth: visible ? ((root.pillHudType !== "" ? hudRow.implicitWidth : pillRow.implicitWidth) + Kirigami.Units.largeSpacing * 3.0) : 0
+        Layout.minimumWidth: visible ? ((root.pillHudType !== "" ? hudRow.implicitWidth : pillRow.implicitWidth) + CachyTheme.spacingLarge * 3.0) : 0
         Layout.preferredWidth: Layout.minimumWidth
         Layout.fillHeight: true
 
@@ -239,7 +240,7 @@ PlasmoidItem {
             id: pillCapsule
             anchors.centerIn: parent
             width: parent.width - 6
-            height: Math.max(18, Math.min(parent.height - 2, Kirigami.Units.gridUnit * 1.75))
+            height: Math.max(18, parent.height)
             radius: height / 2
             color: "#000000"
             border.width: root.pillHudType === "timer_done" ? 2 : 1
@@ -251,7 +252,7 @@ PlasmoidItem {
                 id: hudRow
                 anchors.centerIn: parent
                 visible: root.pillHudType !== ""
-                spacing: Kirigami.Units.smallSpacing
+                spacing: CachyTheme.spacingSmall
 
                 Kirigami.Icon {
                     implicitWidth: 14
@@ -320,7 +321,7 @@ PlasmoidItem {
                 id: pillRow
                 anchors.centerIn: parent
                 visible: root.pillHudType === ""
-                spacing: Kirigami.Units.mediumSpacing * 1.15
+                spacing: CachyTheme.spacingMedium * 1.15
 
                 // Left side: Album Art / Video Thumbnail or Shazam Icon or Fallback Music Icon in rounded box
                 Rectangle {
@@ -401,7 +402,7 @@ PlasmoidItem {
 
                 // Live PipeWire Audio Spectrum Bars when Media Track or Shazam is Present
                 Row {
-                    visible: compactPillRoot.cfgShowWaveform && (Plasmoid.trackTitle.length > 0 || Plasmoid.songRecognizer.listening)
+                    visible: compactPillRoot.cfgShowWaveform && (Plasmoid.mediaPlaying || Plasmoid.trackTitle.length > 0 || Plasmoid.songRecognizer.listening)
                     spacing: 3
                     Layout.alignment: Qt.AlignVCenter
 
@@ -467,8 +468,8 @@ PlasmoidItem {
     fullRepresentation: Item {
         id: expandedIsland
 
-        readonly property int targetWidth: Math.max(Kirigami.Units.gridUnit * 29, mainColumn.implicitWidth + Kirigami.Units.largeSpacing * 2)
-        readonly property int targetHeight: mainColumn.implicitHeight + Kirigami.Units.largeSpacing * 2
+        readonly property int targetWidth: Math.max(Kirigami.Units.gridUnit * 29, mainColumn.implicitWidth + CachyTheme.spacingLarge * 2)
+        readonly property int targetHeight: mainColumn.implicitHeight + CachyTheme.spacingLarge * 2
 
         implicitWidth: targetWidth
         implicitHeight: targetHeight
@@ -486,13 +487,13 @@ PlasmoidItem {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            anchors.margins: Kirigami.Units.largeSpacing
-            spacing: Kirigami.Units.mediumSpacing
+            anchors.margins: CachyTheme.spacingLarge
+            spacing: CachyTheme.spacingMedium
 
             // Header + Vitals + Focus chip + Quick Launchers (Alcove / NotchNook style)
             RowLayout {
                 Layout.fillWidth: true
-                spacing: Kirigami.Units.smallSpacing
+                spacing: CachyTheme.spacingSmall
 
                 Kirigami.Heading {
                     level: 4
@@ -501,9 +502,9 @@ PlasmoidItem {
 
                 Rectangle {
                     radius: 6
-                    color: Kirigami.Theme.alternateBackgroundColor
+                    color: CachyTheme.cardBackground
                     border.width: 1
-                    border.color: Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.15)
+                    border.color: Kirigami.ColorUtils.linearInterpolation(CachyTheme.windowBackground, CachyTheme.textPrimary, 0.15)
                     implicitWidth: vitalsLbl.implicitWidth + 12
                     implicitHeight: vitalsLbl.implicitHeight + 6
                     Layout.preferredWidth: implicitWidth
@@ -513,7 +514,7 @@ PlasmoidItem {
                         id: vitalsLbl
                         anchors.centerIn: parent
                         font: Kirigami.Theme.smallFont
-                        color: Kirigami.Theme.textColor
+                        color: CachyTheme.textPrimary
                         opacity: 0.85
                         text: "CPU " + Plasmoid.cpuUsagePercent + "% · RAM " + Plasmoid.ramUsagePercent + "%"
                     }
@@ -523,9 +524,9 @@ PlasmoidItem {
                 Rectangle {
                     id: focusChipRect
                     radius: 6
-                    color: (Plasmoid.focusDndActive || Plasmoid.focusActive) ? Qt.rgba(1, 0.6, 0, 0.18) : Kirigami.Theme.alternateBackgroundColor
+                    color: (Plasmoid.focusDndActive || Plasmoid.focusActive) ? Qt.rgba(1, 0.6, 0, 0.18) : CachyTheme.cardBackground
                     border.width: 1
-                    border.color: (Plasmoid.focusDndActive || Plasmoid.focusActive) ? "#ff9f0a" : Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.15)
+                    border.color: (Plasmoid.focusDndActive || Plasmoid.focusActive) ? "#ff9f0a" : Kirigami.ColorUtils.linearInterpolation(CachyTheme.windowBackground, CachyTheme.textPrimary, 0.15)
                     implicitWidth: focusChipRow.implicitWidth + 14
                     implicitHeight: vitalsLbl.implicitHeight + 6
                     Layout.preferredWidth: implicitWidth
@@ -540,13 +541,13 @@ PlasmoidItem {
                             implicitWidth: 13
                             implicitHeight: 13
                             source: Plasmoid.focusModeIcon.length > 0 ? Plasmoid.focusModeIcon : (Plasmoid.focusDndActive ? "notifications-disabled" : "preferences-desktop-notification-bell")
-                            color: (Plasmoid.focusDndActive || Plasmoid.focusActive) ? "#ff9f0a" : Kirigami.Theme.textColor
+                            color: (Plasmoid.focusDndActive || Plasmoid.focusActive) ? "#ff9f0a" : CachyTheme.textPrimary
                         }
 
                         PlasmaComponents3.Label {
                             font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                             font.weight: Font.Medium
-                            color: (Plasmoid.focusDndActive || Plasmoid.focusActive) ? "#ff9f0a" : Kirigami.Theme.textColor
+                            color: (Plasmoid.focusDndActive || Plasmoid.focusActive) ? "#ff9f0a" : CachyTheme.textPrimary
                             text: {
                                 if (Plasmoid.focusActive && Plasmoid.focusModeName.length > 0) {
                                     return Plasmoid.focusModeName;
@@ -572,9 +573,9 @@ PlasmoidItem {
                 Rectangle {
                     visible: Plasmoid.micActive || Plasmoid.cameraOrScreenActive
                     radius: 6
-                    color: Qt.rgba(Kirigami.Theme.neutralTextColor.r, Kirigami.Theme.neutralTextColor.g, Kirigami.Theme.neutralTextColor.b, 0.15)
+                    color: Qt.rgba(CachyTheme.textSecondary.r, CachyTheme.textSecondary.g, CachyTheme.textSecondary.b, 0.15)
                     border.width: 1
-                    border.color: Kirigami.Theme.neutralTextColor
+                    border.color: CachyTheme.textSecondary
                     implicitWidth: privLbl.implicitWidth + 12
                     implicitHeight: privLbl.implicitHeight + 6
                     Layout.preferredWidth: implicitWidth
@@ -584,7 +585,7 @@ PlasmoidItem {
                         id: privLbl
                         anchors.centerIn: parent
                         font: Kirigami.Theme.smallFont
-                        color: Kirigami.Theme.neutralTextColor
+                        color: CachyTheme.textSecondary
                         text: {
                             const parts = [];
                             if (Plasmoid.micActive) parts.push("🎙️ " + Plasmoid.micApp);
@@ -633,7 +634,7 @@ PlasmoidItem {
             // Tabs Switcher
             RowLayout {
                 Layout.fillWidth: true
-                spacing: Kirigami.Units.smallSpacing
+                spacing: CachyTheme.spacingSmall
 
                 PlasmaComponents3.Button {
                     text: i18n("🎵 Multimedia")
@@ -656,29 +657,29 @@ PlasmoidItem {
                 id: multimediaTabCol
                 Layout.fillWidth: true
                 visible: root.currentTab === 0
-                spacing: Kirigami.Units.mediumSpacing
+                spacing: CachyTheme.spacingMedium
 
                 // 1. Media Player Card (MPRIS2 + Interactive Scrubber + Shuffle/Loop + PipeWire Waveform)
             Rectangle {
                 Layout.fillWidth: true
-                implicitHeight: mediaCol.implicitHeight + Kirigami.Units.mediumSpacing * 2
+                implicitHeight: mediaCol.implicitHeight + CachyTheme.spacingMedium * 2
                 Layout.preferredHeight: implicitHeight
-                radius: Kirigami.Units.smallSpacing
-                color: Kirigami.Theme.alternateBackgroundColor
+                radius: CachyTheme.spacingSmall
+                color: CachyTheme.cardBackground
                 border.width: 1
-                border.color: Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.15)
+                border.color: Kirigami.ColorUtils.linearInterpolation(CachyTheme.windowBackground, CachyTheme.textPrimary, 0.15)
 
                 ColumnLayout {
                     id: mediaCol
                     anchors.left: parent.left
                     anchors.right: parent.right
                     anchors.top: parent.top
-                    anchors.margins: Kirigami.Units.mediumSpacing
-                    spacing: Kirigami.Units.smallSpacing
+                    anchors.margins: CachyTheme.spacingMedium
+                    spacing: CachyTheme.spacingSmall
 
                     RowLayout {
                         Layout.fillWidth: true
-                        spacing: Kirigami.Units.mediumSpacing
+                        spacing: CachyTheme.spacingMedium
 
                         // Clickable Album Cover Art / Video Preview Frame (Raises player window on click)
                         Rectangle {
@@ -688,9 +689,9 @@ PlasmoidItem {
                             Layout.preferredWidth: frameW
                             Layout.preferredHeight: 64
                             radius: 8
-                            color: Kirigami.Theme.backgroundColor
+                            color: CachyTheme.windowBackground
                             border.width: 1
-                            border.color: coverMouse.containsMouse ? Kirigami.Theme.highlightColor : Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.20)
+                            border.color: coverMouse.containsMouse ? CachyTheme.accentColor : Kirigami.ColorUtils.linearInterpolation(CachyTheme.windowBackground, CachyTheme.textPrimary, 0.20)
                             clip: true
 
                             Image {
@@ -766,8 +767,8 @@ PlasmoidItem {
                         Row {
                             spacing: 4
                             Layout.alignment: Qt.AlignVCenter
-                            Layout.leftMargin: Kirigami.Units.smallSpacing
-                            Layout.rightMargin: Kirigami.Units.smallSpacing
+                            Layout.leftMargin: CachyTheme.spacingSmall
+                            Layout.rightMargin: CachyTheme.spacingSmall
                             Repeater {
                                 model: Plasmoid.spectrumBars
                                 Rectangle {
@@ -775,7 +776,7 @@ PlasmoidItem {
                                     width: 4
                                     height: Plasmoid.mediaPlaying ? Math.max(6, Number(modelData) * 26) : 6
                                     radius: 2
-                                    color: Plasmoid.mediaPlaying ? "#00e676" : Kirigami.Theme.disabledTextColor
+                                    color: Plasmoid.mediaPlaying ? "#00e676" : CachyTheme.textMuted
                                     anchors.verticalCenter: parent.verticalCenter
                                     Behavior on height { NumberAnimation { duration: 80 } }
                                 }
@@ -787,11 +788,11 @@ PlasmoidItem {
                     RowLayout {
                         Layout.fillWidth: true
                         visible: Plasmoid.trackTitle.length > 0
-                        spacing: Kirigami.Units.smallSpacing
+                        spacing: CachyTheme.spacingSmall
 
                         PlasmaComponents3.Label {
                             font: Kirigami.Theme.smallFont
-                            color: Kirigami.Theme.textColor
+                            color: CachyTheme.textPrimary
                             opacity: 0.75
                             Layout.minimumWidth: 42
                             text: Plasmoid.trackElapsedText
@@ -809,7 +810,7 @@ PlasmoidItem {
 
                         PlasmaComponents3.Label {
                             font: Kirigami.Theme.smallFont
-                            color: Kirigami.Theme.textColor
+                            color: CachyTheme.textPrimary
                             opacity: 0.75
                             Layout.minimumWidth: 48
                             horizontalAlignment: Text.AlignRight
@@ -820,7 +821,7 @@ PlasmoidItem {
                     // Full Transport Controls (Shuffle, -10s, Prev, Play/Pause, Next, +10s, Loop)
                     RowLayout {
                         Layout.alignment: Qt.AlignHCenter
-                        spacing: Kirigami.Units.mediumSpacing
+                        spacing: CachyTheme.spacingMedium
 
                         PlasmaComponents3.ToolButton {
                             icon.name: "media-playlist-shuffle-symbolic"
@@ -888,31 +889,31 @@ PlasmoidItem {
             // 3. Music Recognition (macOS Shazam integration) — listens to the PipeWire default sink
             Rectangle {
                 Layout.fillWidth: true
-                implicitHeight: shazamCol.implicitHeight + Kirigami.Units.mediumSpacing * 2
+                implicitHeight: shazamCol.implicitHeight + CachyTheme.spacingMedium * 2
                 Layout.preferredHeight: implicitHeight
-                radius: Kirigami.Units.smallSpacing
-                color: Kirigami.Theme.alternateBackgroundColor
+                radius: CachyTheme.spacingSmall
+                color: CachyTheme.cardBackground
                 border.width: 1
-                border.color: Plasmoid.songRecognizer.listening ? "#0088ff" : Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.15)
+                border.color: Plasmoid.songRecognizer.listening ? "#0088ff" : Kirigami.ColorUtils.linearInterpolation(CachyTheme.windowBackground, CachyTheme.textPrimary, 0.15)
 
                 ColumnLayout {
                     id: shazamCol
                     anchors.left: parent.left
                     anchors.right: parent.right
                     anchors.top: parent.top
-                    anchors.margins: Kirigami.Units.mediumSpacing
-                    spacing: Kirigami.Units.smallSpacing
+                    anchors.margins: CachyTheme.spacingMedium
+                    spacing: CachyTheme.spacingSmall
 
                     // Header row: Title + Actions
                     RowLayout {
                         Layout.fillWidth: true
-                        spacing: Kirigami.Units.smallSpacing
+                        spacing: CachyTheme.spacingSmall
 
                         Kirigami.Icon {
                             Layout.preferredWidth: 20
                             Layout.preferredHeight: 20
                             source: "emblem-music-symbolic"
-                            color: Plasmoid.songRecognizer.listening ? "#0088ff" : Kirigami.Theme.highlightColor
+                            color: Plasmoid.songRecognizer.listening ? "#0088ff" : CachyTheme.accentColor
                         }
 
                         PlasmaComponents3.Label {
@@ -949,15 +950,15 @@ PlasmoidItem {
                         visible: Plasmoid.songRecognizer.listening
                         Layout.fillWidth: true
                         implicitHeight: 44
-                        radius: Kirigami.Units.smallSpacing
+                        radius: CachyTheme.spacingSmall
                         color: Qt.rgba(0.0, 0.53, 1.0, 0.12)
                         border.width: 1
                         border.color: "#0088ff"
 
                         RowLayout {
                             anchors.fill: parent
-                            anchors.margins: Kirigami.Units.smallSpacing
-                            spacing: Kirigami.Units.mediumSpacing
+                            anchors.margins: CachyTheme.spacingSmall
+                            spacing: CachyTheme.spacingMedium
 
                             PlasmaComponents3.BusyIndicator {
                                 Layout.preferredWidth: 20
@@ -970,7 +971,7 @@ PlasmoidItem {
                                 text: Plasmoid.songRecognizer.status.length > 0
                                     ? Plasmoid.songRecognizer.status
                                     : i18n("Escuchando música…")
-                                color: Kirigami.Theme.textColor
+                                color: CachyTheme.textPrimary
                                 font.weight: Font.Medium
                             }
                         }
@@ -980,17 +981,17 @@ PlasmoidItem {
                     Rectangle {
                         visible: !Plasmoid.songRecognizer.listening && Plasmoid.songRecognizer.title.length > 0 && Plasmoid.songRecognizer.recognizedActive
                         Layout.fillWidth: true
-                        implicitHeight: activeResultRow.implicitHeight + Kirigami.Units.smallSpacing * 2
-                        radius: Kirigami.Units.smallSpacing
-                        color: Kirigami.Theme.backgroundColor
+                        implicitHeight: activeResultRow.implicitHeight + CachyTheme.spacingSmall * 2
+                        radius: CachyTheme.spacingSmall
+                        color: CachyTheme.windowBackground
                         border.width: 1
-                        border.color: Kirigami.Theme.highlightColor
+                        border.color: CachyTheme.accentColor
 
                         RowLayout {
                             id: activeResultRow
                             anchors.fill: parent
-                            anchors.margins: Kirigami.Units.smallSpacing
-                            spacing: Kirigami.Units.mediumSpacing
+                            anchors.margins: CachyTheme.spacingSmall
+                            spacing: CachyTheme.spacingMedium
 
                             Rectangle {
                                 implicitWidth: 44
@@ -998,7 +999,7 @@ PlasmoidItem {
                                 Layout.preferredWidth: 44
                                 Layout.preferredHeight: 44
                                 radius: 6
-                                color: Kirigami.Theme.alternateBackgroundColor
+                                color: CachyTheme.cardBackground
                                 clip: true
 
                                 Image {
@@ -1070,7 +1071,7 @@ PlasmoidItem {
                         PlasmaComponents3.Label {
                             text: i18n("Historial de canciones reconocidas:")
                             font.pixelSize: Kirigami.Theme.smallFont.pixelSize
-                            color: Kirigami.Theme.disabledTextColor
+                            color: CachyTheme.textMuted
                             font.bold: true
                         }
 
@@ -1085,21 +1086,21 @@ PlasmoidItem {
                                 Layout.fillWidth: true
                                 implicitHeight: 38
                                 radius: 4
-                                color: Kirigami.Theme.backgroundColor
+                                color: CachyTheme.windowBackground
                                 border.width: 1
-                                border.color: Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.10)
+                                border.color: Kirigami.ColorUtils.linearInterpolation(CachyTheme.windowBackground, CachyTheme.textPrimary, 0.10)
 
                                 RowLayout {
                                     anchors.fill: parent
-                                    anchors.leftMargin: Kirigami.Units.smallSpacing
-                                    anchors.rightMargin: Kirigami.Units.smallSpacing
-                                    spacing: Kirigami.Units.smallSpacing
+                                    anchors.leftMargin: CachyTheme.spacingSmall
+                                    anchors.rightMargin: CachyTheme.spacingSmall
+                                    spacing: CachyTheme.spacingSmall
 
                                     Rectangle {
                                         implicitWidth: 26
                                         implicitHeight: 26
                                         radius: 4
-                                        color: Kirigami.Theme.alternateBackgroundColor
+                                        color: CachyTheme.cardBackground
                                         clip: true
 
                                         Image {
@@ -1135,7 +1136,7 @@ PlasmoidItem {
                                             Layout.fillWidth: true
                                             text: (historyItemDelegate.modelData.artist || "") + (historyItemDelegate.modelData.timestamp ? " · " + historyItemDelegate.modelData.timestamp : "")
                                             font.pixelSize: Kirigami.Theme.smallFont.pixelSize - 1
-                                            color: Kirigami.Theme.disabledTextColor
+                                            color: CachyTheme.textMuted
                                             elide: Text.ElideRight
                                         }
                                     }
@@ -1170,7 +1171,7 @@ PlasmoidItem {
                         text: Plasmoid.songRecognizer.status.length > 0
                             ? Plasmoid.songRecognizer.status
                             : i18n("Pulsa «Reconocer canción» para identificar cualquier música que suene en tu equipo.")
-                        color: Kirigami.Theme.disabledTextColor
+                        color: CachyTheme.textMuted
                         font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                         wrapMode: Text.WordWrap
                     }
@@ -1180,24 +1181,24 @@ PlasmoidItem {
             // 4. Live Activity Timer Card with Progress Bar & Pause/Resume
             Rectangle {
                 Layout.fillWidth: true
-                implicitHeight: timerCol.implicitHeight + Kirigami.Units.mediumSpacing * 2
+                implicitHeight: timerCol.implicitHeight + CachyTheme.spacingMedium * 2
                 Layout.preferredHeight: implicitHeight
-                radius: Kirigami.Units.smallSpacing
-                color: Kirigami.Theme.alternateBackgroundColor
+                radius: CachyTheme.spacingSmall
+                color: CachyTheme.cardBackground
                 border.width: 1
-                border.color: Plasmoid.timerActive ? Kirigami.Theme.highlightColor : Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.15)
+                border.color: Plasmoid.timerActive ? CachyTheme.accentColor : Kirigami.ColorUtils.linearInterpolation(CachyTheme.windowBackground, CachyTheme.textPrimary, 0.15)
 
                 ColumnLayout {
                     id: timerCol
                     anchors.left: parent.left
                     anchors.right: parent.right
                     anchors.top: parent.top
-                    anchors.margins: Kirigami.Units.mediumSpacing
-                    spacing: Kirigami.Units.smallSpacing
+                    anchors.margins: CachyTheme.spacingMedium
+                    spacing: CachyTheme.spacingSmall
 
                     RowLayout {
                         Layout.fillWidth: true
-                        spacing: Kirigami.Units.smallSpacing
+                        spacing: CachyTheme.spacingSmall
                         PlasmaComponents3.Label {
                             Layout.fillWidth: true
                             font.bold: true
@@ -1231,7 +1232,7 @@ PlasmoidItem {
                     RowLayout {
                         Layout.fillWidth: true
                         visible: !Plasmoid.timerActive
-                        spacing: Kirigami.Units.smallSpacing
+                        spacing: CachyTheme.spacingSmall
 
                         Repeater {
                             model: [
@@ -1254,7 +1255,7 @@ PlasmoidItem {
                     RowLayout {
                         Layout.fillWidth: true
                         visible: !Plasmoid.timerActive
-                        spacing: Kirigami.Units.smallSpacing
+                        spacing: CachyTheme.spacingSmall
 
                         PlasmaComponents3.SpinBox {
                             id: customHoursSpin
@@ -1294,7 +1295,7 @@ PlasmoidItem {
                     RowLayout {
                         Layout.fillWidth: true
                         visible: !Plasmoid.timerActive
-                        spacing: Kirigami.Units.smallSpacing
+                        spacing: CachyTheme.spacingSmall
 
                         PlasmaComponents3.TextField {
                             id: customLabelField
@@ -1335,18 +1336,18 @@ PlasmoidItem {
                 id: dropShelfTabCol
                 Layout.fillWidth: true
                 visible: root.currentTab === 1
-                spacing: Kirigami.Units.mediumSpacing
+                spacing: CachyTheme.spacingMedium
 
                 // Shelf Container with DropArea
                 Rectangle {
                     id: dropShelfBox
                     Layout.fillWidth: true
-                    implicitHeight: Math.max(160, shelfListCol.implicitHeight + Kirigami.Units.mediumSpacing * 2)
+                    implicitHeight: Math.max(160, shelfListCol.implicitHeight + CachyTheme.spacingMedium * 2)
                     Layout.preferredHeight: implicitHeight
-                    radius: Kirigami.Units.smallSpacing
-                    color: Kirigami.Theme.alternateBackgroundColor
+                    radius: CachyTheme.spacingSmall
+                    color: CachyTheme.cardBackground
                     border.width: shelfDropArea.containsDrag ? 2 : 1
-                    border.color: shelfDropArea.containsDrag ? "#0a84ff" : Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.15)
+                    border.color: shelfDropArea.containsDrag ? "#0a84ff" : Kirigami.ColorUtils.linearInterpolation(CachyTheme.windowBackground, CachyTheme.textPrimary, 0.15)
 
                     DropArea {
                         id: shelfDropArea
@@ -1356,11 +1357,11 @@ PlasmoidItem {
                             dropShelfBox.border.width = 2;
                         }
                         onExited: {
-                            dropShelfBox.border.color = Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.15);
+                            dropShelfBox.border.color = Kirigami.ColorUtils.linearInterpolation(CachyTheme.windowBackground, CachyTheme.textPrimary, 0.15);
                             dropShelfBox.border.width = 1;
                         }
                         onDropped: (drop) => {
-                            dropShelfBox.border.color = Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.15);
+                            dropShelfBox.border.color = Kirigami.ColorUtils.linearInterpolation(CachyTheme.windowBackground, CachyTheme.textPrimary, 0.15);
                             dropShelfBox.border.width = 1;
                             const urls = root.extractUrlsFromDrop(drop);
                             for (let i = 0; i < urls.length; ++i) {
@@ -1375,12 +1376,12 @@ PlasmoidItem {
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.top: parent.top
-                        anchors.margins: Kirigami.Units.mediumSpacing
-                        spacing: Kirigami.Units.smallSpacing
+                        anchors.margins: CachyTheme.spacingMedium
+                        spacing: CachyTheme.spacingSmall
 
                         RowLayout {
                             Layout.fillWidth: true
-                            spacing: Kirigami.Units.smallSpacing
+                            spacing: CachyTheme.spacingSmall
 
                             Kirigami.Heading {
                                 level: 5
@@ -1404,9 +1405,9 @@ PlasmoidItem {
                             Layout.fillWidth: true
                             implicitHeight: 110
                             radius: 8
-                            color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.03)
+                            color: Qt.rgba(CachyTheme.textPrimary.r, CachyTheme.textPrimary.g, CachyTheme.textPrimary.b, 0.03)
                             border.width: 1
-                            border.color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.12)
+                            border.color: Qt.rgba(CachyTheme.textPrimary.r, CachyTheme.textPrimary.g, CachyTheme.textPrimary.b, 0.12)
 
                             ColumnLayout {
                                 anchors.centerIn: parent
@@ -1441,7 +1442,7 @@ PlasmoidItem {
                             id: shelfFlow
                             Layout.fillWidth: true
                             visible: shelfModel.count > 0
-                            spacing: Kirigami.Units.smallSpacing
+                            spacing: CachyTheme.spacingSmall
 
                             Repeater {
                                 model: shelfModel
@@ -1454,7 +1455,7 @@ PlasmoidItem {
                                     required property string filePath
                                     required property string fileIcon
 
-                                    width: Math.min(220, Math.floor((dropShelfBox.width - Kirigami.Units.mediumSpacing * 2 - Kirigami.Units.smallSpacing) / 2))
+                                    width: Math.min(220, Math.floor((dropShelfBox.width - CachyTheme.spacingMedium * 2 - CachyTheme.spacingSmall) / 2))
                                     height: 54
 
                                     Drag.active: fileMouse.drag.active
@@ -1469,9 +1470,9 @@ PlasmoidItem {
                                     Rectangle {
                                         anchors.fill: parent
                                         radius: 6
-                                        color: fileMouse.containsMouse ? Kirigami.Theme.hoverColor : Kirigami.Theme.backgroundColor
+                                        color: fileMouse.containsMouse ? Kirigami.Theme.hoverColor : CachyTheme.windowBackground
                                         border.width: 1
-                                        border.color: fileMouse.drag.active ? Kirigami.Theme.highlightColor : Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.18)
+                                        border.color: fileMouse.drag.active ? CachyTheme.accentColor : Kirigami.ColorUtils.linearInterpolation(CachyTheme.windowBackground, CachyTheme.textPrimary, 0.18)
 
                                         RowLayout {
                                             anchors.fill: parent
@@ -1543,12 +1544,12 @@ PlasmoidItem {
                 Rectangle {
                     id: airdropCard
                     Layout.fillWidth: true
-                    implicitHeight: airdropCol.implicitHeight + Kirigami.Units.mediumSpacing * 2
+                    implicitHeight: airdropCol.implicitHeight + CachyTheme.spacingMedium * 2
                     Layout.preferredHeight: implicitHeight
-                    radius: Kirigami.Units.smallSpacing
-                    color: Kirigami.Theme.alternateBackgroundColor
+                    radius: CachyTheme.spacingSmall
+                    color: CachyTheme.cardBackground
                     border.width: 1
-                    border.color: Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.15)
+                    border.color: Kirigami.ColorUtils.linearInterpolation(CachyTheme.windowBackground, CachyTheme.textPrimary, 0.15)
 
                     property var kdeDevices: []
 
@@ -1570,12 +1571,12 @@ PlasmoidItem {
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.top: parent.top
-                        anchors.margins: Kirigami.Units.mediumSpacing
-                        spacing: Kirigami.Units.smallSpacing
+                        anchors.margins: CachyTheme.spacingMedium
+                        spacing: CachyTheme.spacingSmall
 
                         RowLayout {
                             Layout.fillWidth: true
-                            spacing: Kirigami.Units.smallSpacing
+                            spacing: CachyTheme.spacingSmall
 
                             Kirigami.Icon {
                                 implicitWidth: 16
@@ -1614,7 +1615,7 @@ PlasmoidItem {
                         RowLayout {
                             Layout.fillWidth: true
                             visible: airdropCard.kdeDevices.length > 0
-                            spacing: Kirigami.Units.smallSpacing
+                            spacing: CachyTheme.spacingSmall
 
                             Repeater {
                                 model: airdropCard.kdeDevices
