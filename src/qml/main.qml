@@ -210,7 +210,7 @@ PlasmoidItem {
         DropArea {
             anchors.fill: parent
             onEntered: (drag) => {
-                pillCapsule.border.color = "#0a84ff";
+                pillCapsule.border.color = CachyTheme.accentColor;
                 pillCapsule.border.width = 2;
                 // Auto-expand island directly into Drop Shelf on hover/drag
                 root.currentTab = 1;
@@ -242,9 +242,11 @@ PlasmoidItem {
             width: parent.width - 6
             height: Math.max(18, parent.height)
             radius: height / 2
+            // La cápsula es una superficie NEGRA fija (estilo Dynamic Island),
+            // no la superficie del panel: su contenido es siempre blanco.
             color: "#000000"
             border.width: root.pillHudType === "timer_done" ? 2 : 1
-            border.color: root.pillHudType === "timer_done" ? "#ff9f0a" : Qt.rgba(1, 1, 1, 0.15)
+            border.color: root.pillHudType === "timer_done" ? CachyTheme.warningColor : Qt.rgba(1, 1, 1, 0.15)
             clip: true
 
             // Transient Dynamic HUD Row (Volume, Bluetooth Peripherals, Focus/DND, AirDrop, Timer Done)
@@ -261,7 +263,8 @@ PlasmoidItem {
                     Layout.preferredHeight: 14
                     Layout.alignment: Qt.AlignVCenter
                     source: root.hudIcon
-                    color: (root.pillHudType === "timer_done" || root.pillHudType === "focus") ? "#ff9f0a" : (root.pillHudType === "volume" ? "#ffffff" : "#30d158")
+                    isMask: true
+                    color: (root.pillHudType === "timer_done" || root.pillHudType === "focus") ? CachyTheme.warningColor : (root.pillHudType === "volume" ? "#FFFFFF" : CachyTheme.successColor)
                 }
 
                 RowLayout {
@@ -282,12 +285,12 @@ PlasmoidItem {
                             anchors.bottom: parent.bottom
                             width: Math.max(0, Math.min(parent.width, parent.width * (root.hudValue / 100.0)))
                             radius: 2.5
-                            color: "#ffffff"
+                            color: "#FFFFFF"
                         }
                     }
 
                     PlasmaComponents3.Label {
-                        color: "#ffffff"
+                        color: "#FFFFFF"
                         font.pixelSize: Math.min(Kirigami.Theme.smallFont.pixelSize, Math.max(10, pillCapsule.height - 8))
                         font.weight: Font.Medium
                         text: root.hudTitle
@@ -300,7 +303,7 @@ PlasmoidItem {
                     Layout.alignment: Qt.AlignVCenter
 
                     PlasmaComponents3.Label {
-                        color: root.pillHudType === "timer_done" ? "#ff9f0a" : "#ffffff"
+                        color: root.pillHudType === "timer_done" ? CachyTheme.warningColor : "#FFFFFF"
                         font.pixelSize: Math.min(Kirigami.Theme.smallFont.pixelSize, Math.max(10, pillCapsule.height - 8))
                         font.weight: Font.DemiBold
                         text: root.hudTitle
@@ -334,7 +337,7 @@ PlasmoidItem {
                     Layout.preferredHeight: boxSize
                     Layout.alignment: Qt.AlignVCenter
                     radius: Math.max(3, Math.round(boxSize * 0.24))
-                    color: "#1c1c1e"
+                    color: CachyPalette.windowBackground
                     border.width: 1
                     border.color: Qt.rgba(1, 1, 1, 0.12)
                     clip: true
@@ -353,7 +356,8 @@ PlasmoidItem {
                         width: Math.max(10, parent.width - 4)
                         height: Math.max(10, parent.height - 4)
                         source: (Plasmoid.songRecognizer.listening || Plasmoid.songRecognizer.recognizedActive) ? "emblem-music-symbolic" : "audio-x-generic"
-                        color: (Plasmoid.songRecognizer.listening || Plasmoid.songRecognizer.recognizedActive) ? "#0a84ff" : "#ffffff"
+                        isMask: true
+                        color: (Plasmoid.songRecognizer.listening || Plasmoid.songRecognizer.recognizedActive) ? CachyTheme.accentColor : "#FFFFFF"
                         visible: !Plasmoid.songRecognizer.recognizedActive ? (Plasmoid.trackArtUrl.length === 0 || Plasmoid.songRecognizer.listening) : (Plasmoid.songRecognizer.coverUrl.length === 0)
                     }
                 }
@@ -366,16 +370,16 @@ PlasmoidItem {
                     Layout.alignment: Qt.AlignVCenter
                     radius: 4
                     color: {
-                        if (Plasmoid.kityState === "listening" || Plasmoid.kiriState === "listening") return "#00e5ff";
-                        if (Plasmoid.timerActive) return "#ff9500";
-                        return "#ffffff";
+                        if (Plasmoid.kityState === "listening" || Plasmoid.kiriState === "listening") return CachyTheme.accentColor;
+                        if (Plasmoid.timerActive) return CachyTheme.warningColor;
+                        return "#FFFFFF";
                     }
                 }
 
                 // Compact label: Clean Media title (no play icons, matching macOS Dynamic Island), Shazam, Countdown, or System Vitals
                 PlasmaComponents3.Label {
                     Layout.alignment: Qt.AlignVCenter
-                    color: "#ffffff"
+                    color: "#FFFFFF"
                     font.pixelSize: Math.min(Kirigami.Theme.smallFont.pixelSize, Math.max(10, pillCapsule.height - 8))
                     font.weight: Font.Medium
                     text: {
@@ -415,7 +419,7 @@ PlasmoidItem {
                             readonly property real maxBarH: Math.max(8, pillCapsule.height - 8)
                             height: (Plasmoid.mediaPlaying || Plasmoid.songRecognizer.listening) ? Math.max(4, Number(modelData) * maxBarH) : 4
                             radius: 1.5
-                            color: Plasmoid.songRecognizer.listening ? "#0a84ff" : (Plasmoid.mediaPlaying ? "#30d158" : Qt.rgba(1, 1, 1, 0.35))
+                            color: Plasmoid.songRecognizer.listening ? CachyTheme.accentColor : (Plasmoid.mediaPlaying ? CachyTheme.successColor : Qt.rgba(1, 1, 1, 0.35))
                             anchors.verticalCenter: parent.verticalCenter
                             Behavior on height { NumberAnimation { duration: 80 } }
                         }
@@ -433,7 +437,7 @@ PlasmoidItem {
                         width: 7
                         height: 7
                         radius: 3.5
-                        color: "#ff9500"
+                        color: CachyTheme.warningColor
                     }
 
                     Rectangle {
@@ -441,7 +445,7 @@ PlasmoidItem {
                         width: 7
                         height: 7
                         radius: 3.5
-                        color: "#34c759"
+                        color: CachyTheme.successColor
                     }
                 }
             }
@@ -501,10 +505,10 @@ PlasmoidItem {
                 }
 
                 Rectangle {
-                    radius: 6
-                    color: CachyTheme.cardBackground
+                    radius: CachyTheme.radiusSmall
+                    color: CachyPalette.cardBackground
                     border.width: 1
-                    border.color: Kirigami.ColorUtils.linearInterpolation(CachyTheme.windowBackground, CachyTheme.textPrimary, 0.15)
+                    border.color: CachyPalette.specularBorder
                     implicitWidth: vitalsLbl.implicitWidth + 12
                     implicitHeight: vitalsLbl.implicitHeight + 6
                     Layout.preferredWidth: implicitWidth
@@ -514,7 +518,7 @@ PlasmoidItem {
                         id: vitalsLbl
                         anchors.centerIn: parent
                         font: Kirigami.Theme.smallFont
-                        color: CachyTheme.textPrimary
+                        color: CachyPalette.text
                         opacity: 0.85
                         text: "CPU " + Plasmoid.cpuUsagePercent + "% · RAM " + Plasmoid.ramUsagePercent + "%"
                     }
@@ -523,10 +527,10 @@ PlasmoidItem {
                 // Focus Mode / No Molestar Chip (Interactive toggle linked to KFocus)
                 Rectangle {
                     id: focusChipRect
-                    radius: 6
-                    color: (Plasmoid.focusDndActive || Plasmoid.focusActive) ? Qt.rgba(1, 0.6, 0, 0.18) : CachyTheme.cardBackground
+                    radius: CachyTheme.radiusSmall
+                    color: (Plasmoid.focusDndActive || Plasmoid.focusActive) ? Qt.rgba(1, 0.6, 0, 0.18) : CachyPalette.cardBackground
                     border.width: 1
-                    border.color: (Plasmoid.focusDndActive || Plasmoid.focusActive) ? "#ff9f0a" : Kirigami.ColorUtils.linearInterpolation(CachyTheme.windowBackground, CachyTheme.textPrimary, 0.15)
+                    border.color: (Plasmoid.focusDndActive || Plasmoid.focusActive) ? CachyTheme.warningColor : CachyPalette.specularBorder
                     implicitWidth: focusChipRow.implicitWidth + 14
                     implicitHeight: vitalsLbl.implicitHeight + 6
                     Layout.preferredWidth: implicitWidth
@@ -541,13 +545,14 @@ PlasmoidItem {
                             implicitWidth: 13
                             implicitHeight: 13
                             source: Plasmoid.focusModeIcon.length > 0 ? Plasmoid.focusModeIcon : (Plasmoid.focusDndActive ? "notifications-disabled" : "preferences-desktop-notification-bell")
-                            color: (Plasmoid.focusDndActive || Plasmoid.focusActive) ? "#ff9f0a" : CachyTheme.textPrimary
+                            isMask: true
+                            color: (Plasmoid.focusDndActive || Plasmoid.focusActive) ? CachyTheme.warningColor : CachyPalette.text
                         }
 
                         PlasmaComponents3.Label {
                             font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                             font.weight: Font.Medium
-                            color: (Plasmoid.focusDndActive || Plasmoid.focusActive) ? "#ff9f0a" : CachyTheme.textPrimary
+                            color: (Plasmoid.focusDndActive || Plasmoid.focusActive) ? CachyTheme.warningColor : CachyPalette.text
                             text: {
                                 if (Plasmoid.focusActive && Plasmoid.focusModeName.length > 0) {
                                     return Plasmoid.focusModeName;
@@ -572,10 +577,10 @@ PlasmoidItem {
                 // Active Privacy Pill inside Expanded Island
                 Rectangle {
                     visible: Plasmoid.micActive || Plasmoid.cameraOrScreenActive
-                    radius: 6
-                    color: Qt.rgba(CachyTheme.textSecondary.r, CachyTheme.textSecondary.g, CachyTheme.textSecondary.b, 0.15)
+                    radius: CachyTheme.radiusSmall
+                    color: Qt.rgba(CachyPalette.textSecondary.r, CachyPalette.textSecondary.g, CachyPalette.textSecondary.b, 0.15)
                     border.width: 1
-                    border.color: CachyTheme.textSecondary
+                    border.color: CachyPalette.textSecondary
                     implicitWidth: privLbl.implicitWidth + 12
                     implicitHeight: privLbl.implicitHeight + 6
                     Layout.preferredWidth: implicitWidth
@@ -585,7 +590,7 @@ PlasmoidItem {
                         id: privLbl
                         anchors.centerIn: parent
                         font: Kirigami.Theme.smallFont
-                        color: CachyTheme.textSecondary
+                        color: CachyPalette.textSecondary
                         text: {
                             const parts = [];
                             if (Plasmoid.micActive) parts.push("🎙️ " + Plasmoid.micApp);
@@ -660,10 +665,10 @@ PlasmoidItem {
                 Layout.fillWidth: true
                 implicitHeight: mediaCol.implicitHeight + CachyTheme.spacingMedium * 2
                 Layout.preferredHeight: implicitHeight
-                radius: CachyTheme.spacingSmall
-                color: CachyTheme.cardBackground
+                radius: CachyTheme.radiusSmall
+                color: CachyPalette.cardBackground
                 border.width: 1
-                border.color: Kirigami.ColorUtils.linearInterpolation(CachyTheme.windowBackground, CachyTheme.textPrimary, 0.15)
+                border.color: CachyPalette.specularBorder
 
                 ColumnLayout {
                     id: mediaCol
@@ -684,10 +689,10 @@ PlasmoidItem {
                             implicitHeight: 64
                             Layout.preferredWidth: frameW
                             Layout.preferredHeight: 64
-                            radius: 8
-                            color: CachyTheme.windowBackground
+                            radius: CachyTheme.radiusSmall
+                            color: CachyPalette.windowBackground
                             border.width: 1
-                            border.color: coverMouse.containsMouse ? CachyTheme.accentColor : Kirigami.ColorUtils.linearInterpolation(CachyTheme.windowBackground, CachyTheme.textPrimary, 0.20)
+                            border.color: coverMouse.containsMouse ? CachyTheme.accentColor : CachyPalette.specularBorder
                             clip: true
 
                             Image {
@@ -772,7 +777,7 @@ PlasmoidItem {
                                     width: 4
                                     height: Plasmoid.mediaPlaying ? Math.max(6, Number(modelData) * 26) : 6
                                     radius: 2
-                                    color: Plasmoid.mediaPlaying ? "#00e676" : CachyTheme.textMuted
+                                    color: Plasmoid.mediaPlaying ? CachyTheme.successColor : CachyPalette.textMuted
                                     anchors.verticalCenter: parent.verticalCenter
                                     Behavior on height { NumberAnimation { duration: 80 } }
                                 }
@@ -788,7 +793,7 @@ PlasmoidItem {
 
                         PlasmaComponents3.Label {
                             font: Kirigami.Theme.smallFont
-                            color: CachyTheme.textPrimary
+                            color: CachyPalette.text
                             opacity: 0.75
                             Layout.minimumWidth: 42
                             text: Plasmoid.trackElapsedText
@@ -806,7 +811,7 @@ PlasmoidItem {
 
                         PlasmaComponents3.Label {
                             font: Kirigami.Theme.smallFont
-                            color: CachyTheme.textPrimary
+                            color: CachyPalette.text
                             opacity: 0.75
                             Layout.minimumWidth: 48
                             horizontalAlignment: Text.AlignRight
@@ -883,10 +888,10 @@ PlasmoidItem {
                 Layout.fillWidth: true
                 implicitHeight: shazamCol.implicitHeight + CachyTheme.spacingMedium * 2
                 Layout.preferredHeight: implicitHeight
-                radius: CachyTheme.spacingSmall
-                color: CachyTheme.cardBackground
+                radius: CachyTheme.radiusSmall
+                color: CachyPalette.cardBackground
                 border.width: 1
-                border.color: Plasmoid.songRecognizer.listening ? "#0088ff" : Kirigami.ColorUtils.linearInterpolation(CachyTheme.windowBackground, CachyTheme.textPrimary, 0.15)
+                border.color: Plasmoid.songRecognizer.listening ? CachyTheme.accentColor : CachyPalette.specularBorder
 
                 ColumnLayout {
                     id: shazamCol
@@ -905,7 +910,8 @@ PlasmoidItem {
                             Layout.preferredWidth: 20
                             Layout.preferredHeight: 20
                             source: "emblem-music-symbolic"
-                            color: Plasmoid.songRecognizer.listening ? "#0088ff" : CachyTheme.accentColor
+                            isMask: true
+                            color: CachyPalette.accentText
                         }
 
                         PlasmaComponents3.Label {
@@ -941,10 +947,10 @@ PlasmoidItem {
                         visible: Plasmoid.songRecognizer.listening
                         Layout.fillWidth: true
                         implicitHeight: 44
-                        radius: CachyTheme.spacingSmall
+                        radius: CachyTheme.radiusSmall
                         color: Qt.rgba(0.0, 0.53, 1.0, 0.12)
                         border.width: 1
-                        border.color: "#0088ff"
+                        border.color: CachyTheme.accentColor
 
                         RowLayout {
                             anchors.fill: parent
@@ -962,7 +968,7 @@ PlasmoidItem {
                                 text: Plasmoid.songRecognizer.status.length > 0
                                     ? Plasmoid.songRecognizer.status
                                     : i18n("Escuchando música…")
-                                color: CachyTheme.textPrimary
+                                color: CachyPalette.text
                                 font.weight: Font.Medium
                             }
                         }
@@ -973,8 +979,8 @@ PlasmoidItem {
                         visible: !Plasmoid.songRecognizer.listening && Plasmoid.songRecognizer.title.length > 0 && Plasmoid.songRecognizer.recognizedActive
                         Layout.fillWidth: true
                         implicitHeight: activeResultRow.implicitHeight + CachyTheme.spacingSmall * 2
-                        radius: CachyTheme.spacingSmall
-                        color: CachyTheme.windowBackground
+                        radius: CachyTheme.radiusSmall
+                        color: CachyPalette.windowBackground
                         border.width: 1
                         border.color: CachyTheme.accentColor
 
@@ -989,8 +995,8 @@ PlasmoidItem {
                                 implicitHeight: 44
                                 Layout.preferredWidth: 44
                                 Layout.preferredHeight: 44
-                                radius: 6
-                                color: CachyTheme.cardBackground
+                                radius: CachyTheme.radiusSmall
+                                color: CachyPalette.cardBackground
                                 clip: true
 
                                 Image {
@@ -1059,7 +1065,7 @@ PlasmoidItem {
                         PlasmaComponents3.Label {
                             text: i18n("Historial de canciones reconocidas:")
                             font.pixelSize: Kirigami.Theme.smallFont.pixelSize
-                            color: CachyTheme.textMuted
+                            color: CachyPalette.textMuted
                             font.bold: true
                         }
 
@@ -1074,9 +1080,9 @@ PlasmoidItem {
                                 Layout.fillWidth: true
                                 implicitHeight: 38
                                 radius: 4
-                                color: CachyTheme.windowBackground
+                                color: CachyPalette.windowBackground
                                 border.width: 1
-                                border.color: Kirigami.ColorUtils.linearInterpolation(CachyTheme.windowBackground, CachyTheme.textPrimary, 0.10)
+                                border.color: CachyPalette.specularBorder
 
                                 RowLayout {
                                     anchors.fill: parent
@@ -1088,7 +1094,7 @@ PlasmoidItem {
                                         implicitWidth: 26
                                         implicitHeight: 26
                                         radius: 4
-                                        color: CachyTheme.cardBackground
+                                        color: CachyPalette.cardBackground
                                         clip: true
 
                                         Image {
@@ -1124,7 +1130,7 @@ PlasmoidItem {
                                             Layout.fillWidth: true
                                             text: (historyItemDelegate.modelData.artist || "") + (historyItemDelegate.modelData.timestamp ? " · " + historyItemDelegate.modelData.timestamp : "")
                                             font.pixelSize: Kirigami.Theme.smallFont.pixelSize - 1
-                                            color: CachyTheme.textMuted
+                                            color: CachyPalette.textMuted
                                             elide: Text.ElideRight
                                         }
                                     }
@@ -1157,7 +1163,7 @@ PlasmoidItem {
                         text: Plasmoid.songRecognizer.status.length > 0
                             ? Plasmoid.songRecognizer.status
                             : i18n("Pulsa «Reconocer canción» para identificar cualquier música que suene en tu equipo.")
-                        color: CachyTheme.textMuted
+                        color: CachyPalette.textMuted
                         font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                         wrapMode: Text.WordWrap
                     }
@@ -1169,10 +1175,10 @@ PlasmoidItem {
                 Layout.fillWidth: true
                 implicitHeight: timerCol.implicitHeight + CachyTheme.spacingMedium * 2
                 Layout.preferredHeight: implicitHeight
-                radius: CachyTheme.spacingSmall
-                color: CachyTheme.cardBackground
+                radius: CachyTheme.radiusSmall
+                color: CachyPalette.cardBackground
                 border.width: 1
-                border.color: Plasmoid.timerActive ? CachyTheme.accentColor : Kirigami.ColorUtils.linearInterpolation(CachyTheme.windowBackground, CachyTheme.textPrimary, 0.15)
+                border.color: Plasmoid.timerActive ? CachyTheme.accentColor : CachyPalette.specularBorder
 
                 ColumnLayout {
                     id: timerCol
@@ -1330,24 +1336,24 @@ PlasmoidItem {
                     Layout.fillWidth: true
                     implicitHeight: Math.max(160, shelfListCol.implicitHeight + CachyTheme.spacingMedium * 2)
                     Layout.preferredHeight: implicitHeight
-                    radius: CachyTheme.spacingSmall
-                    color: CachyTheme.cardBackground
+                    radius: CachyTheme.radiusSmall
+                    color: CachyPalette.cardBackground
                     border.width: shelfDropArea.containsDrag ? 2 : 1
-                    border.color: shelfDropArea.containsDrag ? "#0a84ff" : Kirigami.ColorUtils.linearInterpolation(CachyTheme.windowBackground, CachyTheme.textPrimary, 0.15)
+                    border.color: shelfDropArea.containsDrag ? CachyTheme.accentColor : CachyPalette.specularBorder
 
                     DropArea {
                         id: shelfDropArea
                         anchors.fill: parent
                         onEntered: (drag) => {
-                            dropShelfBox.border.color = "#0a84ff";
+                            dropShelfBox.border.color = CachyTheme.accentColor;
                             dropShelfBox.border.width = 2;
                         }
                         onExited: {
-                            dropShelfBox.border.color = Kirigami.ColorUtils.linearInterpolation(CachyTheme.windowBackground, CachyTheme.textPrimary, 0.15);
+                            dropShelfBox.border.color = CachyPalette.specularBorder;
                             dropShelfBox.border.width = 1;
                         }
                         onDropped: (drop) => {
-                            dropShelfBox.border.color = Kirigami.ColorUtils.linearInterpolation(CachyTheme.windowBackground, CachyTheme.textPrimary, 0.15);
+                            dropShelfBox.border.color = CachyPalette.specularBorder;
                             dropShelfBox.border.width = 1;
                             const urls = root.extractUrlsFromDrop(drop);
                             for (let i = 0; i < urls.length; ++i) {
@@ -1390,10 +1396,10 @@ PlasmoidItem {
                             visible: shelfModel.count === 0
                             Layout.fillWidth: true
                             implicitHeight: 110
-                            radius: 8
-                            color: Qt.rgba(CachyTheme.textPrimary.r, CachyTheme.textPrimary.g, CachyTheme.textPrimary.b, 0.03)
+                            radius: CachyTheme.radiusSmall
+                            color: Qt.rgba(CachyPalette.text.r, CachyPalette.text.g, CachyPalette.text.b, 0.03)
                             border.width: 1
-                            border.color: Qt.rgba(CachyTheme.textPrimary.r, CachyTheme.textPrimary.g, CachyTheme.textPrimary.b, 0.12)
+                            border.color: Qt.rgba(CachyPalette.text.r, CachyPalette.text.g, CachyPalette.text.b, 0.12)
 
                             ColumnLayout {
                                 anchors.centerIn: parent
@@ -1404,6 +1410,8 @@ PlasmoidItem {
                                     implicitWidth: 32
                                     implicitHeight: 32
                                     source: "folder-stash-symbolic"
+                                    isMask: true
+                                    color: CachyPalette.textSecondary
                                     opacity: 0.6
                                 }
 
@@ -1455,10 +1463,10 @@ PlasmoidItem {
 
                                     Rectangle {
                                         anchors.fill: parent
-                                        radius: 6
-                                        color: fileMouse.containsMouse ? Kirigami.Theme.hoverColor : CachyTheme.windowBackground
+                                        radius: CachyTheme.radiusSmall
+                                        color: fileMouse.containsMouse ? Kirigami.Theme.hoverColor : CachyPalette.windowBackground
                                         border.width: 1
-                                        border.color: fileMouse.drag.active ? CachyTheme.accentColor : Kirigami.ColorUtils.linearInterpolation(CachyTheme.windowBackground, CachyTheme.textPrimary, 0.18)
+                                        border.color: fileMouse.drag.active ? CachyTheme.accentColor : CachyPalette.specularBorder
 
                                         RowLayout {
                                             anchors.fill: parent
@@ -1530,10 +1538,10 @@ PlasmoidItem {
                     Layout.fillWidth: true
                     implicitHeight: airdropCol.implicitHeight + CachyTheme.spacingMedium * 2
                     Layout.preferredHeight: implicitHeight
-                    radius: CachyTheme.spacingSmall
-                    color: CachyTheme.cardBackground
+                    radius: CachyTheme.radiusSmall
+                    color: CachyPalette.cardBackground
                     border.width: 1
-                    border.color: Kirigami.ColorUtils.linearInterpolation(CachyTheme.windowBackground, CachyTheme.textPrimary, 0.15)
+                    border.color: CachyPalette.specularBorder
 
                     property var kdeDevices: []
 
