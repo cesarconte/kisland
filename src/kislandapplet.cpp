@@ -959,7 +959,10 @@ void KIslandApplet::onTimerTick()
         cancelQuickTimer();
 
         // 1. Play official macOS timer/alarm sound via PipeWire
-        const QString alarmSound = QStringLiteral("/home/cesar/.local/share/sounds/macOS-GoldenGate/stereo/alarm-clock-elapsed.oga");
+        QString alarmSound = QStandardPaths::locate(QStandardPaths::GenericDataLocation, QStringLiteral("sounds/macOS-GoldenGate/stereo/alarm-clock-elapsed.oga"));
+        if (alarmSound.isEmpty()) {
+            alarmSound = QStringLiteral("/usr/share/sounds/macOS-GoldenGate/stereo/alarm-clock-elapsed.oga");
+        }
         if (QFile::exists(alarmSound)) {
             QProcess::startDetached(QStringLiteral("pw-play"), {alarmSound});
         }
