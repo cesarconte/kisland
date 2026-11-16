@@ -4,7 +4,7 @@
 
 KIsland transforma el centro del panel superior de KDE Plasma 6 en una **Píldora Dinámica interactiva** con estética **Liquid Glass**:
 - **MPRIS2 Media & Live Waveform (PipeWire)**: Detecta automáticamente cualquier reproductor multimedia en reproducción (Spotify, Elisa, Firefox, VLC), muestra título/artista y renderiza un visualizador de onda reactivo en tiempo real capturando el monitor del sumidero por defecto de PipeWire (`stream.capture.sink=true`, respetando EasyEffects).
-- **Live Activities de Kiri & Temporizadores**: Sincroniza recordatorios/temporizadores activos de Kiri (`~/.local/share/kiri/reminders.json`) y permite crear temporizadores rápidos desde la isla.
+- **Live Activities de Kity & Temporizadores**: Sincroniza recordatorios/temporizadores activos de Kity (`~/.local/share/kity/reminders.json`) y permite crear temporizadores rápidos desde la isla.
 - **Telemetría de Sistema y Batería (UPower / CachyOS)**: Muestra estado de carga/batería o actividad de CPU/RAM al expandir la isla.
 
 ---
