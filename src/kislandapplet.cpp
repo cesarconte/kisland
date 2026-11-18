@@ -5,1438 +5,198 @@
 
 #include "kislandapplet.h"
 
+#include "audioprivacymanager.h"
+#include "mediaengine.h"
 #include "songrecognizer.h"
+#include "systemintegrationservice.h"
+#include "systemvitalsmonitor.h"
+#include "timermanager.h"
 
-#include <cmath>
-
-#include <KIO/CommandLauncherJob>
-#include <KLocalizedString>
-#include <KNotification>
 #include <KPluginFactory>
-
-#include <QCryptographicHash>
-#include <QDBusArgument>
-#include <QDBusConnection>
-#include <QDBusConnectionInterface>
-#include <QDBusInterface>
-#include <QDBusMessage>
-#include <QDBusObjectPath>
-#include <QDBusReply>
-#include <QDBusVariant>
-#include <QDesktopServices>
-#include <QDir>
-#include <QFile>
-#include <QFileInfo>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QRegularExpression>
-#include <QSet>
-#include <QStandardPaths>
-#include <QUrl>
-
-K_PLUGIN_CLASS_WITH_JSON(KIslandApplet, "metadata.json")
+#include <QTimer>
 
 KIslandApplet::KIslandApplet(QObject *parent, const KPluginMetaData &data, const QVariantList &args)
     : Plasma::Applet(parent, data, args)
+    , m_mediaEngine(new MediaEngine(this))
+    , m_timerManager(new TimerManager(this))
+    , m_audioPrivacyManager(new AudioPrivacyManager(this))
+    , m_vitalsMonitor(new SystemVitalsMonitor(this))
+    , m_systemService(new SystemIntegrationService(this))
+    , m_songRecognizer(new SongRecognizer(this))
     , m_pollTimer(new QTimer(this))
-    , m_countdownTimer(new QTimer(this))
 {
-    m_songRecognizer = new SongRecognizer(this);
+    // Wire MediaEngine signals
+    connect(m_mediaEngine, &MediaEngine::mediaStateChanged, this, &KIslandApplet::mediaStateChanged);
+    connect(m_mediaEngine, &MediaEngine::spectrumChanged, this, &KIslandApplet::spectrumChanged);
+
+    // Wire TimerManager signals
+    connect(m_timerManager, &TimerManager::timerChanged, this, &KIslandApplet::timerChanged);
+    connect(m_timerManager, &TimerManager::timerFinished, this, &KIslandApplet::timerFinished);
+
+    // Wire AudioPrivacyManager signals
+    connect(m_audioPrivacyManager, &AudioPrivacyManager::audioChanged, this, &KIslandApplet::audioChanged);
+    connect(m_audioPrivacyManager, &AudioPrivacyManager::privacyChanged, this, &KIslandApplet::privacyChanged);
+    connect(m_audioPrivacyManager, &AudioPrivacyManager::volumeAlert, this, &KIslandApplet::volumeAlert);
+
+    // Wire SystemVitalsMonitor signals
+    connect(m_vitalsMonitor, &SystemVitalsMonitor::vitalsChanged, this, &KIslandApplet::vitalsChanged);
+
+    // Wire SystemIntegrationService signals
+    connect(m_systemService, &SystemIntegrationService::kityStateChanged, this, &KIslandApplet::kityStateChanged);
+    connect(m_systemService, &SystemIntegrationService::kiriStateChanged, this, &KIslandApplet::kiriStateChanged);
+    connect(m_systemService, &SystemIntegrationService::focusStateChanged, this, &KIslandApplet::focusStateChanged);
+    connect(m_systemService, &SystemIntegrationService::peripheralAlert, this, &KIslandApplet::peripheralAlert);
+    connect(m_systemService, &SystemIntegrationService::focusAlert, this, &KIslandApplet::focusAlert);
 }
 
-KIslandApplet::~KIslandApplet()
-{
-    stopPipeWireSpectrumMonitor();
-}
+KIslandApplet::~KIslandApplet() = default;
 
 void KIslandApplet::init()
 {
     Plasma::Applet::init();
 
-    connect(m_pollTimer, &QTimer::timeout, this, &KIslandApplet::pollMprisAndActivities);
+    connect(m_pollTimer, &QTimer::timeout, this, &KIslandApplet::pollActivities);
     m_pollTimer->start(1800);
-
-    connect(m_countdownTimer, &QTimer::timeout, this, &KIslandApplet::onTimerTick);
 
     if (m_songRecognizer) {
         connect(m_songRecognizer, &SongRecognizer::stateChanged, this, [this]() {
-            const bool shouldMonitor = m_mediaPlaying || (m_songRecognizer && m_songRecognizer->listening());
+            const bool shouldMonitor = m_mediaEngine->mediaPlaying() || (m_songRecognizer && m_songRecognizer->listening());
             if (shouldMonitor) {
-                startPipeWireSpectrumMonitor();
+                m_mediaEngine->startPipeWireSpectrumMonitor();
             } else {
-                stopPipeWireSpectrumMonitor();
+                m_mediaEngine->stopPipeWireSpectrumMonitor();
             }
         });
     }
 
-    pollMprisAndActivities();
+    pollActivities();
 }
 
-bool KIslandApplet::mediaPlaying() const { return m_mediaPlaying; }
-QString KIslandApplet::trackTitle() const { return m_trackTitle; }
-QString KIslandApplet::trackArtist() const { return m_trackArtist; }
-QString KIslandApplet::trackAlbum() const { return m_trackAlbum; }
-QString KIslandApplet::trackArtUrl() const { return m_trackArtUrl; }
-bool KIslandApplet::isVideoMedia() const { return m_isVideoMedia; }
-QString KIslandApplet::playerName() const { return m_playerName; }
-qint64 KIslandApplet::trackPositionSecs() const { return m_trackPositionSecs; }
-qint64 KIslandApplet::trackDurationSecs() const { return m_trackDurationSecs; }
-QString KIslandApplet::trackElapsedText() const { return formatCountdown(m_trackPositionSecs); }
-QString KIslandApplet::trackRemainingText() const
+void KIslandApplet::pollActivities()
 {
-    if (m_trackDurationSecs <= 0) {
-        return QStringLiteral("--:--");
-    }
-    const qint64 rem = qMax<qint64>(0, m_trackDurationSecs - m_trackPositionSecs);
-    return QStringLiteral("-") + formatCountdown(rem);
+    m_vitalsMonitor->updateVitals();
+    m_systemService->updateKityState();
+    m_audioPrivacyManager->updatePipeWireAudioAndPrivacy(m_systemService->kityState());
+    m_systemService->updateBluetoothAndPeripherals();
+    m_systemService->updateFocusMode();
+
+    const bool recognizerListening = m_songRecognizer && m_songRecognizer->listening();
+    m_mediaEngine->pollPlayers(recognizerListening);
 }
-double KIslandApplet::trackProgress() const
-{
-    if (m_trackDurationSecs <= 0) {
-        return 0.0;
-    }
-    return qBound(0.0, static_cast<double>(m_trackPositionSecs) / static_cast<double>(m_trackDurationSecs), 1.0);
-}
-bool KIslandApplet::shuffleEnabled() const { return m_shuffleEnabled; }
-QString KIslandApplet::loopStatus() const { return m_loopStatus; }
-QVariantList KIslandApplet::spectrumBars() const { return m_spectrumBars; }
-bool KIslandApplet::timerActive() const { return m_timerActive; }
-bool KIslandApplet::timerPaused() const { return m_timerPaused; }
-double KIslandApplet::timerProgress() const
-{
-    if (!m_timerActive || m_timerTotalSecs <= 0) {
-        return 0.0;
-    }
-    const qint64 rem = m_timerPaused
-        ? m_timerPausedRemainingSecs
-        : qMax<qint64>(0, QDateTime::currentDateTime().secsTo(m_timerTarget));
-    return qBound(0.0, static_cast<double>(rem) / static_cast<double>(m_timerTotalSecs), 1.0);
-}
-QString KIslandApplet::timerRemainingText() const { return m_timerRemainingText; }
-QString KIslandApplet::timerLabel() const { return m_timerLabel; }
-QString KIslandApplet::kiriState() const { return m_kityState; }
-QString KIslandApplet::kityState() const { return m_kityState; }
-int KIslandApplet::cpuUsagePercent() const { return m_cpuUsagePercent; }
-int KIslandApplet::ramUsagePercent() const { return m_ramUsagePercent; }
-int KIslandApplet::outputVolumePercent() const { return m_outputVolumePercent; }
-bool KIslandApplet::outputMuted() const { return m_outputMuted; }
-QString KIslandApplet::outputDeviceName() const { return m_outputDeviceName; }
+
+// Media Engine property getters
+bool KIslandApplet::mediaPlaying() const { return m_mediaEngine->mediaPlaying(); }
+QString KIslandApplet::trackTitle() const { return m_mediaEngine->trackTitle(); }
+QString KIslandApplet::trackArtist() const { return m_mediaEngine->trackArtist(); }
+QString KIslandApplet::trackAlbum() const { return m_mediaEngine->trackAlbum(); }
+QString KIslandApplet::trackArtUrl() const { return m_mediaEngine->trackArtUrl(); }
+bool KIslandApplet::isVideoMedia() const { return m_mediaEngine->isVideoMedia(); }
+QString KIslandApplet::playerName() const { return m_mediaEngine->playerName(); }
+qint64 KIslandApplet::trackPositionSecs() const { return m_mediaEngine->trackPositionSecs(); }
+qint64 KIslandApplet::trackDurationSecs() const { return m_mediaEngine->trackDurationSecs(); }
+QString KIslandApplet::trackElapsedText() const { return m_mediaEngine->trackElapsedText(); }
+QString KIslandApplet::trackRemainingText() const { return m_mediaEngine->trackRemainingText(); }
+double KIslandApplet::trackProgress() const { return m_mediaEngine->trackProgress(); }
+bool KIslandApplet::shuffleEnabled() const { return m_mediaEngine->shuffleEnabled(); }
+QString KIslandApplet::loopStatus() const { return m_mediaEngine->loopStatus(); }
+QVariantList KIslandApplet::spectrumBars() const { return m_mediaEngine->spectrumBars(); }
+
+// Timer Manager property getters
+bool KIslandApplet::timerActive() const { return m_timerManager->isActive(); }
+bool KIslandApplet::timerPaused() const { return m_timerManager->isPaused(); }
+double KIslandApplet::timerProgress() const { return m_timerManager->progress(); }
+QString KIslandApplet::timerRemainingText() const { return m_timerManager->remainingText(); }
+QString KIslandApplet::timerLabel() const { return m_timerManager->label(); }
+
+// System & Vitals property getters
+QString KIslandApplet::kiriState() const { return m_systemService->kityState(); }
+QString KIslandApplet::kityState() const { return m_systemService->kityState(); }
+int KIslandApplet::cpuUsagePercent() const { return m_vitalsMonitor->cpuUsagePercent(); }
+int KIslandApplet::ramUsagePercent() const { return m_vitalsMonitor->ramUsagePercent(); }
+
+// Audio & Privacy property getters
+int KIslandApplet::outputVolumePercent() const { return m_audioPrivacyManager->outputVolumePercent(); }
+bool KIslandApplet::outputMuted() const { return m_audioPrivacyManager->outputMuted(); }
+QString KIslandApplet::outputDeviceName() const { return m_audioPrivacyManager->outputDeviceName(); }
 QObject *KIslandApplet::songRecognizer() const { return m_songRecognizer; }
-bool KIslandApplet::micActive() const { return m_micActive; }
-QString KIslandApplet::micApp() const { return m_micApp; }
-bool KIslandApplet::cameraOrScreenActive() const { return m_cameraOrScreenActive; }
-QString KIslandApplet::cameraOrScreenApp() const { return m_cameraOrScreenApp; }
-bool KIslandApplet::focusActive() const { return m_focusActive; }
-QString KIslandApplet::focusModeName() const { return m_focusModeName; }
-QString KIslandApplet::focusModeIcon() const { return m_focusModeIcon; }
-bool KIslandApplet::focusDndActive() const { return m_focusDndActive; }
+bool KIslandApplet::micActive() const { return m_audioPrivacyManager->micActive(); }
+QString KIslandApplet::micApp() const { return m_audioPrivacyManager->micApp(); }
+bool KIslandApplet::cameraOrScreenActive() const { return m_audioPrivacyManager->cameraOrScreenActive(); }
+QString KIslandApplet::cameraOrScreenApp() const { return m_audioPrivacyManager->cameraOrScreenApp(); }
 
+// Focus property getters
+bool KIslandApplet::focusActive() const { return m_systemService->focusActive(); }
+QString KIslandApplet::focusModeName() const { return m_systemService->focusModeName(); }
+QString KIslandApplet::focusModeIcon() const { return m_systemService->focusModeIcon(); }
+bool KIslandApplet::focusDndActive() const { return m_systemService->focusDndActive(); }
+
+// Media actions
+void KIslandApplet::playPauseMedia() { m_mediaEngine->playPauseMedia(); }
+void KIslandApplet::nextTrack() { m_mediaEngine->nextTrack(); }
+void KIslandApplet::previousTrack() { m_mediaEngine->previousTrack(); }
+void KIslandApplet::seekToRatio(double ratio) { m_mediaEngine->seekToRatio(ratio); }
+void KIslandApplet::skipBySeconds(int deltaSeconds) { m_mediaEngine->skipBySeconds(deltaSeconds); }
+void KIslandApplet::toggleShuffle() { m_mediaEngine->toggleShuffle(); }
+void KIslandApplet::cycleLoopStatus() { m_mediaEngine->cycleLoopStatus(); }
+void KIslandApplet::raiseMediaPlayer() { m_mediaEngine->raiseMediaPlayer(); }
+
+// Timer actions
+void KIslandApplet::startQuickTimer(int durationSeconds, const QString &label)
+{
+    m_timerManager->startQuickTimer(durationSeconds, label);
+}
+void KIslandApplet::togglePauseTimer() { m_timerManager->togglePauseTimer(); }
+void KIslandApplet::cancelQuickTimer() { m_timerManager->cancelQuickTimer(); }
+
+// System & Integration actions
+void KIslandApplet::invokeKity() { m_systemService->invokeKity(); }
+void KIslandApplet::invokeKiriVoice() { m_systemService->invokeKiriVoice(); }
+void KIslandApplet::launchDropover() { m_systemService->launchDropover(); }
+void KIslandApplet::launchLiveCaptions() { m_systemService->launchLiveCaptions(); }
+QVariantList KIslandApplet::getKdeConnectDevices() const { return m_systemService->getKdeConnectDevices(); }
+bool KIslandApplet::shareToKdeConnect(const QString &filePath, const QString &deviceId)
+{
+    return m_systemService->shareToKdeConnect(filePath, deviceId);
+}
+void KIslandApplet::openKdeConnectSettings() { m_systemService->openKdeConnectSettings(); }
+void KIslandApplet::openFileLocation(const QString &filePath) { m_systemService->openFileLocation(filePath); }
+void KIslandApplet::toggleFocusDnd() { m_systemService->toggleFocusDnd(); }
+
+// Audio actions
+void KIslandApplet::setOutputVolume(int percent) { m_audioPrivacyManager->setOutputVolume(percent); }
+void KIslandApplet::toggleOutputMute() { m_audioPrivacyManager->toggleOutputMute(); }
+
+// Static test helpers
 QVariantList KIslandApplet::computeSpectrumBarsFromPcm(const QByteArray &pcmChunk, int barCount)
 {
-    QVariantList result;
-    if (barCount <= 0) return result;
-
-    constexpr int totalSamples = 256;
-    if (pcmChunk.size() < totalSamples * static_cast<int>(sizeof(qint16))) {
-        for (int i = 0; i < barCount; ++i) result.append(0.15);
-        return result;
-    }
-
-    const qint16 *samples = reinterpret_cast<const qint16 *>(pcmChunk.constData());
-    std::array<double, totalSamples> re;
-    std::array<double, totalSamples> im;
-    im.fill(0.0);
-
-    for (int i = 0; i < totalSamples; ++i) {
-        re[i] = samples[i] / 32768.0;
-    }
-
-    // Bit-reversal permutation
-    int j = 0;
-    for (int i = 0; i < totalSamples - 1; ++i) {
-        if (i < j) {
-            std::swap(re[i], re[j]);
-        }
-        int k = totalSamples >> 1;
-        while (k <= j) {
-            j -= k;
-            k >>= 1;
-        }
-        j += k;
-    }
-
-    // Cooley-Tukey Radix-2 FFT
-    int step = 2;
-    while (step <= totalSamples) {
-        const int half = step >> 1;
-        const double angle = -2.0 * M_PI / step;
-        const double w_re = std::cos(angle);
-        const double w_im = std::sin(angle);
-        for (int i = 0; i < totalSamples; i += step) {
-            double u_re = 1.0;
-            double u_im = 0.0;
-            for (int m = 0; m < half; ++m) {
-                const int pos = i + m;
-                const double t_re = u_re * re[pos + half] - u_im * im[pos + half];
-                const double t_im = u_re * im[pos + half] + u_im * re[pos + half];
-                re[pos + half] = re[pos] - t_re;
-                im[pos + half] = im[pos] - t_im;
-                re[pos] += t_re;
-                im[pos] += t_im;
-                const double next_u_re = u_re * w_re - u_im * w_im;
-                u_im = u_re * w_im + u_im * w_re;
-                u_re = next_u_re;
-            }
-        }
-        step <<= 1;
-    }
-
-    // 6 log-distributed musical frequency bands spanning 60 Hz to 4000 Hz
-    // Band 0: Sub/Bass (~62 - 187 Hz)
-    // Band 1: Low Mids (~218 - 468 Hz)
-    // Band 2: Mids (~500 - 968 Hz)
-    // Band 3: High Mids (~1000 - 1968 Hz)
-    // Band 4: Presence (~2000 - 2968 Hz)
-    // Band 5: Treble (~3000 - 3968 Hz)
-    static const std::array<std::pair<int, int>, 6> bands = {{
-        {2, 6}, {7, 15}, {16, 31}, {32, 63}, {64, 95}, {96, 127}
-    }};
-
-    for (int b = 0; b < barCount; ++b) {
-        int k_start = 2;
-        int k_end = 127;
-        if (b < static_cast<int>(bands.size())) {
-            k_start = bands[b].first;
-            k_end = bands[b].second;
-        }
-
-        double sum_mag = 0.0;
-        for (int k = k_start; k <= k_end; ++k) {
-            sum_mag += std::sqrt(re[k] * re[k] + im[k] * im[k]);
-        }
-        const double avg_mag = sum_mag / ((k_end - k_start + 1) * (totalSamples / 2.0));
-        const double weight = 1.0 + 1.5 * (static_cast<double>(b) / std::max(1, barCount - 1));
-        const double energy = avg_mag * weight;
-        const double scaled = 0.15 + 0.85 * std::min(1.0, std::sqrt(energy) * 3.2);
-        result.append(scaled);
-    }
-    return result;
+    return MediaEngine::computeSpectrumBarsFromPcm(pcmChunk, barCount);
 }
 
 QString KIslandApplet::formatCountdown(qint64 remainingSeconds)
 {
-    const qint64 clamped = qMax<qint64>(0, remainingSeconds);
-    const qint64 hours = clamped / 3600;
-    const qint64 mins = (clamped % 3600) / 60;
-    const qint64 secs = clamped % 60;
-    if (hours > 0) {
-        return QStringLiteral("%1:%2:%3")
-            .arg(hours, 2, 10, QLatin1Char('0'))
-            .arg(mins, 2, 10, QLatin1Char('0'))
-            .arg(secs, 2, 10, QLatin1Char('0'));
-    }
-    return QStringLiteral("%1:%2")
-        .arg(mins, 2, 10, QLatin1Char('0'))
-        .arg(secs, 2, 10, QLatin1Char('0'));
-}
-
-QVariantMap KIslandApplet::extractMprisMetadata(const QVariant &metadataVariant)
-{
-    QVariantMap map;
-    QVariant unpacked = metadataVariant;
-    if (unpacked.userType() == qMetaTypeId<QDBusVariant>()) {
-        unpacked = unpacked.value<QDBusVariant>().variant();
-    }
-    if (unpacked.userType() == qMetaTypeId<QDBusArgument>()) {
-        const QDBusArgument arg = unpacked.value<QDBusArgument>();
-        arg >> map;
-    } else if (unpacked.canConvert<QVariantMap>()) {
-        map = unpacked.toMap();
-    }
-    return map;
+    return TimerManager::formatCountdown(remainingSeconds);
 }
 
 QVariantMap KIslandApplet::parsePlayerctlLine(const QString &line)
 {
-    QVariantMap res;
-    const QStringList parts = line.trimmed().split(QLatin1Char('\t'));
-    if (parts.size() < 6) {
-        return res;
-    }
-    const QString status = parts.at(0).trimmed();
-    const QString player = parts.at(1).trimmed();
-    QString title = parts.at(2).trimmed();
-    const QString artist = parts.at(3).trimmed();
-    const QString album = parts.at(4).trimmed();
-    const QString urlStr = parts.at(5).trimmed();
-    const QString artUrlStr = parts.size() >= 7 ? parts.at(6).trimmed() : QString();
+    return MediaEngine::parsePlayerctlLine(line);
+}
 
-    if (title.isEmpty() && !urlStr.isEmpty()) {
-        const QUrl u(urlStr);
-        title = u.isLocalFile() ? QFileInfo(u.toLocalFile()).completeBaseName() : u.fileName();
-    }
-
-    res[QStringLiteral("playing")] = (status.compare(QStringLiteral("Playing"), Qt::CaseInsensitive) == 0);
-    res[QStringLiteral("status")] = status;
-    res[QStringLiteral("player")] = player;
-    res[QStringLiteral("title")] = title;
-    res[QStringLiteral("artist")] = artist;
-    res[QStringLiteral("album")] = album;
-    res[QStringLiteral("url")] = urlStr;
-    res[QStringLiteral("artUrl")] = artUrlStr;
-    return res;
+QVariantMap KIslandApplet::extractMprisMetadata(const QVariant &metadataVariant)
+{
+    return MediaEngine::extractMprisMetadata(metadataVariant);
 }
 
 QString KIslandApplet::resolveCoverArtOrVideoThumbnail(const QString &artUrl, const QString &mediaUrl, bool *isVideoOut)
 {
-    bool isVid = false;
-    QString localMediaPath;
-    if (!mediaUrl.isEmpty()) {
-        const QUrl u(mediaUrl);
-        localMediaPath = u.isLocalFile() ? u.toLocalFile() : mediaUrl;
-        const QString ext = QFileInfo(localMediaPath).suffix().toLower();
-        static const QStringList videoExts = {
-            QStringLiteral("mkv"), QStringLiteral("mp4"), QStringLiteral("webm"),
-            QStringLiteral("avi"), QStringLiteral("mov"), QStringLiteral("m4v"), QStringLiteral("ts")
-        };
-        if (videoExts.contains(ext)) {
-            isVid = true;
-        }
-    }
-    if (isVideoOut) {
-        *isVideoOut = isVid;
-    }
-
-    // 1. Direct mpris:artUrl if present and valid
-    if (!artUrl.trimmed().isEmpty()) {
-        const QUrl au(artUrl.trimmed());
-        if (au.isLocalFile()) {
-            if (QFileInfo::exists(au.toLocalFile())) {
-                return au.toString();
-            }
-        } else if (au.scheme() == QStringLiteral("http") || au.scheme() == QStringLiteral("https") || au.scheme() == QStringLiteral("data")) {
-            return au.toString();
-        }
-    }
-
-    if (localMediaPath.isEmpty() || !QFileInfo::exists(localMediaPath)) {
-        return QString();
-    }
-
-    const QFileInfo mediaFi(localMediaPath);
-    const QDir folder = mediaFi.absoluteDir();
-
-    // 2. Check standard folder cover / poster images next to the audio or video file
-    static const QStringList coverCandidates = {
-        QStringLiteral("cover.jpg"), QStringLiteral("cover.png"),
-        QStringLiteral("folder.jpg"), QStringLiteral("folder.png"),
-        QStringLiteral("poster.jpg"), QStringLiteral("poster.png"),
-        QStringLiteral("front.jpg"), QStringLiteral("album.jpg")
-    };
-    for (const QString &cand : coverCandidates) {
-        const QString candPath = folder.filePath(cand);
-        if (QFileInfo::exists(candPath)) {
-            return QUrl::fromLocalFile(candPath).toString();
-        }
-    }
-
-    const QByteArray pathHash = QCryptographicHash::hash(localMediaPath.toUtf8(), QCryptographicHash::Sha1).toHex();
-    const QString ffmpeg = QStandardPaths::findExecutable(QStringLiteral("ffmpeg"));
-
-    // 3. If it is a video file (like .mkv / .mp4 in mpv), extract a preview frame via ffmpeg (cached in /tmp)
-    if (isVid && !ffmpeg.isEmpty()) {
-        const QString thumbPath = QDir::tempPath() + QStringLiteral("/kisland_vidthumb_%1.jpg").arg(QString::fromLatin1(pathHash));
-        if (!QFileInfo::exists(thumbPath)) {
-            QProcess proc;
-            // Fast input seek (-ss 15) before -i takes <80ms on local NVMe/HDD
-            proc.start(ffmpeg, {QStringLiteral("-y"), QStringLiteral("-ss"), QStringLiteral("00:00:15"),
-                                QStringLiteral("-i"), localMediaPath,
-                                QStringLiteral("-frames:v"), QStringLiteral("1"),
-                                QStringLiteral("-vf"), QStringLiteral("scale=240:-1"),
-                                QStringLiteral("-q:v"), QStringLiteral("4"),
-                                thumbPath});
-            proc.waitForFinished(1200);
-        }
-        if (QFileInfo::exists(thumbPath) && QFileInfo(thumbPath).size() > 256) {
-            return QUrl::fromLocalFile(thumbPath).toString();
-        }
-    }
-
-    // 4. If it is an audio file with embedded ID3/FLAC cover art, extract via ffmpeg (cached in /tmp)
-    if (!isVid && !ffmpeg.isEmpty()) {
-        const QString artCachePath = QDir::tempPath() + QStringLiteral("/kisland_audiocover_%1.jpg").arg(QString::fromLatin1(pathHash));
-        if (!QFileInfo::exists(artCachePath)) {
-            QProcess proc;
-            proc.start(ffmpeg, {QStringLiteral("-y"), QStringLiteral("-i"), localMediaPath,
-                                QStringLiteral("-an"), QStringLiteral("-vcodec"), QStringLiteral("mjpeg"),
-                                QStringLiteral("-frames:v"), QStringLiteral("1"),
-                                artCachePath});
-            proc.waitForFinished(900);
-        }
-        if (QFileInfo::exists(artCachePath) && QFileInfo(artCachePath).size() > 256) {
-            return QUrl::fromLocalFile(artCachePath).toString();
-        }
-    }
-
-    return QString();
+    return MediaEngine::resolveCoverArtOrVideoThumbnail(artUrl, mediaUrl, isVideoOut);
 }
 
 QVariantMap KIslandApplet::parseWpctlStatus(const QString &wpctlOutput, const QString &kiriState)
 {
-    QVariantMap res;
-    int volumePercent = 40;
-    bool muted = false;
-    QString deviceName = QStringLiteral("PipeWire");
-    bool micInUse = (kiriState == QStringLiteral("listening"));
-    QString micAppName = micInUse ? QStringLiteral("Kity") : QString();
-    bool camInUse = false;
-    QString camAppName;
-
-    const QStringList lines = wpctlOutput.split(QLatin1Char('\n'));
-    QString section;
-    QString subSection;
-    QString currentStreamClient;
-
-    static const QRegularExpression sinkLineRe(QStringLiteral(R"(^\s*│?\s*\*\s*\d+\.\s+(.+?)\s+\[vol:\s*([0-9.]+)(\s+MUTED)?\])"));
-    // Stream client headers have <= 9 leading spaces (port lines like "163. monitor_FL" have 12+ spaces)
-    static const QRegularExpression streamHeaderRe(QStringLiteral(R"(^\s{1,9}\d+\.\s+([^<>]+?)\s*$)"));
-
-    auto isPortName = [](const QString &name) {
-        return name.startsWith(QStringLiteral("monitor_"))
-            || name.startsWith(QStringLiteral("input_"))
-            || name.startsWith(QStringLiteral("output_"))
-            || name.startsWith(QStringLiteral("capture_"))
-            || name.startsWith(QStringLiteral("playback_"));
-    };
-
-    for (const QString &rawLine : lines) {
-        const QString trimmed = rawLine.trimmed();
-        if (trimmed == QStringLiteral("Audio")) {
-            section = QStringLiteral("Audio");
-            subSection.clear();
-            continue;
-        } else if (trimmed == QStringLiteral("Video")) {
-            section = QStringLiteral("Video");
-            subSection.clear();
-            continue;
-        } else if (trimmed == QStringLiteral("Settings")) {
-            section = QStringLiteral("Settings");
-            subSection.clear();
-            continue;
-        }
-
-        if (trimmed.contains(QStringLiteral("├─ Sinks:")) || trimmed.contains(QStringLiteral("└─ Sinks:"))) {
-            subSection = QStringLiteral("Sinks");
-            continue;
-        } else if (trimmed.contains(QStringLiteral("├─ Sources:")) || trimmed.contains(QStringLiteral("└─ Sources:"))) {
-            subSection = QStringLiteral("Sources");
-            continue;
-        } else if (trimmed.contains(QStringLiteral("├─ Filters:")) || trimmed.contains(QStringLiteral("└─ Filters:"))) {
-            subSection = QStringLiteral("Filters");
-            continue;
-        } else if (trimmed.contains(QStringLiteral("├─ Streams:")) || trimmed.contains(QStringLiteral("└─ Streams:"))) {
-            subSection = QStringLiteral("Streams");
-            currentStreamClient.clear();
-            continue;
-        }
-
-        if (section == QStringLiteral("Audio") && subSection == QStringLiteral("Sinks")) {
-            const QRegularExpressionMatch m = sinkLineRe.match(rawLine);
-            if (m.hasMatch()) {
-                deviceName = m.captured(1).trimmed();
-                const double vol = m.captured(2).toDouble();
-                volumePercent = qBound(0, qRound(vol * 100.0), 150);
-                muted = !m.captured(3).isEmpty();
-            }
-        } else if (section == QStringLiteral("Audio") && subSection == QStringLiteral("Streams")) {
-            const QRegularExpressionMatch hm = streamHeaderRe.match(rawLine);
-            if (hm.hasMatch() && !rawLine.contains(QLatin1Char('<')) && !rawLine.contains(QLatin1Char('>'))) {
-                const QString candidate = hm.captured(1).trimmed();
-                if (!isPortName(candidate)) {
-                    currentStreamClient = candidate;
-                }
-            } else if (rawLine.contains(QLatin1Char('<')) && rawLine.contains(QStringLiteral("[active]"))
-                       && rawLine.contains(QStringLiteral(":capture_"))) {
-                if (!currentStreamClient.isEmpty()
-                    && !isPortName(currentStreamClient)
-                    && !(currentStreamClient == QStringLiteral("pw-record") && kiriState != QStringLiteral("listening"))) {
-                    micInUse = true;
-                    micAppName = (currentStreamClient == QStringLiteral("pw-record")) ? QStringLiteral("Kity") : currentStreamClient;
-                }
-            }
-        } else if (section == QStringLiteral("Video") && subSection == QStringLiteral("Streams")) {
-            const QRegularExpressionMatch hm = streamHeaderRe.match(rawLine);
-            if (hm.hasMatch() && !rawLine.contains(QLatin1Char('<')) && !rawLine.contains(QLatin1Char('>'))) {
-                const QString candidate = hm.captured(1).trimmed();
-                if (!isPortName(candidate)) {
-                    currentStreamClient = candidate;
-                }
-            } else if (rawLine.contains(QStringLiteral("[active]"))) {
-                camInUse = true;
-                camAppName = currentStreamClient.isEmpty() ? QStringLiteral("Vídeo / Pantalla") : currentStreamClient;
-            }
-        }
-    }
-
-    res[QStringLiteral("volumePercent")] = volumePercent;
-    res[QStringLiteral("muted")] = muted;
-    res[QStringLiteral("deviceName")] = deviceName;
-    res[QStringLiteral("micActive")] = micInUse;
-    res[QStringLiteral("micApp")] = micAppName;
-    res[QStringLiteral("cameraOrScreenActive")] = camInUse;
-    res[QStringLiteral("cameraOrScreenApp")] = camAppName;
-    return res;
+    return AudioPrivacyManager::parseWpctlStatus(wpctlOutput, kiriState);
 }
 
-void KIslandApplet::pollMprisAndActivities()
-{
-    updateSystemVitals();
-
-    // 1. Check Kity Assistant state via D-Bus
-    QDBusInterface kityIface(QStringLiteral("org.cesar.kity"),
-                             QStringLiteral("/Kity"),
-                             QStringLiteral("org.freedesktop.DBus.Properties"),
-                             QDBusConnection::sessionBus());
-    QString detectedKity = QStringLiteral("idle");
-    if (kityIface.isValid()) {
-        const QVariant stProp = kityIface.property("state");
-        if (stProp.isValid() && !stProp.toString().isEmpty()) {
-            detectedKity = stProp.toString();
-        }
-    }
-    if (m_kityState != detectedKity) {
-        m_kityState = detectedKity;
-        Q_EMIT kityStateChanged();
-        Q_EMIT kiriStateChanged();
-    }
-
-    updatePipeWireAudioAndPrivacy();
-    updateBluetoothAndPeripherals();
-    updateFocusMode();
-
-    // 2. Discover MPRIS2 Media Players (D-Bus Properties.Get + playerctl fallback)
-    bool foundPlaying = false;
-    QString newTitle;
-    QString newArtist;
-    QString newAlbum;
-    QString newRawArtUrl;
-    QString newMediaUrl;
-    QString newPlayer;
-    QString newObjectId;
-    QString chosenService;
-    qint64 newPosSecs = 0;
-    qint64 newDurSecs = 0;
-    bool newShuffle = false;
-    QString newLoop = QStringLiteral("None");
-
-    if (auto *busIface = QDBusConnection::sessionBus().interface()) {
-        const QStringList services = busIface->registeredServiceNames().value();
-        for (const QString &srv : services) {
-            if (!srv.startsWith(QStringLiteral("org.mpris.MediaPlayer2."))) {
-                continue;
-            }
-
-            QDBusMessage getAllMsg = QDBusMessage::createMethodCall(
-                srv,
-                QStringLiteral("/org/mpris/MediaPlayer2"),
-                QStringLiteral("org.freedesktop.DBus.Properties"),
-                QStringLiteral("GetAll"));
-            getAllMsg << QStringLiteral("org.mpris.MediaPlayer2.Player");
-
-            const QDBusMessage reply = QDBusConnection::sessionBus().call(getAllMsg, QDBus::Block, 400);
-            if (reply.type() != QDBusMessage::ReplyMessage || reply.arguments().isEmpty()) {
-                continue;
-            }
-
-            const QVariantMap props = extractMprisMetadata(reply.arguments().first());
-            const QString status = props.value(QStringLiteral("PlaybackStatus")).toString().trimmed();
-            const QVariantMap meta = extractMprisMetadata(props.value(QStringLiteral("Metadata")));
-
-            const QString urlStr = meta.value(QStringLiteral("xesam:url")).toString().trimmed();
-            const QString artUrlStr = meta.value(QStringLiteral("mpris:artUrl")).toString().trimmed();
-            QString title = meta.value(QStringLiteral("xesam:title")).toString().trimmed();
-            if (title.isEmpty() && !urlStr.isEmpty()) {
-                const QUrl u(urlStr);
-                title = u.isLocalFile() ? QFileInfo(u.toLocalFile()).completeBaseName() : u.fileName();
-            }
-
-            QStringList artists = meta.value(QStringLiteral("xesam:artist")).toStringList();
-            if (artists.isEmpty() && !meta.value(QStringLiteral("xesam:artist")).toString().isEmpty()) {
-                artists << meta.value(QStringLiteral("xesam:artist")).toString();
-            }
-            const QString album = meta.value(QStringLiteral("xesam:album")).toString().trimmed();
-            const QString cleanPlayerName = srv.mid(23).section(QLatin1Char('.'), 0, 0);
-
-            const qint64 posMicros = props.value(QStringLiteral("Position")).toLongLong();
-            const qint64 lenMicros = meta.value(QStringLiteral("mpris:length")).toLongLong();
-            QString trackObjPath;
-            const QVariant trackIdVar = meta.value(QStringLiteral("mpris:trackid"));
-            if (trackIdVar.userType() == qMetaTypeId<QDBusObjectPath>()) {
-                trackObjPath = trackIdVar.value<QDBusObjectPath>().path();
-            } else {
-                trackObjPath = trackIdVar.toString();
-            }
-
-            const bool isPlayingNow = (status.compare(QStringLiteral("Playing"), Qt::CaseInsensitive) == 0);
-            if (isPlayingNow || (chosenService.isEmpty() && !title.isEmpty())) {
-                chosenService = srv;
-                foundPlaying = isPlayingNow;
-                newTitle = title;
-                newArtist = artists.join(QStringLiteral(", "));
-                newAlbum = album;
-                newRawArtUrl = artUrlStr;
-                newMediaUrl = urlStr;
-                newPlayer = cleanPlayerName;
-                newObjectId = trackObjPath;
-                newPosSecs = qMax<qint64>(0, posMicros / 1000000LL);
-                newDurSecs = qMax<qint64>(0, lenMicros / 1000000LL);
-                newShuffle = props.value(QStringLiteral("Shuffle")).toBool();
-                const QString lp = props.value(QStringLiteral("LoopStatus")).toString().trimmed();
-                newLoop = lp.isEmpty() ? QStringLiteral("None") : lp;
-                if (foundPlaying) {
-                    break;
-                }
-            }
-        }
-    }
-
-    // Fallback to playerctl if D-Bus property map returned empty title
-    if (newTitle.isEmpty()) {
-        const QString playerctl = QStandardPaths::findExecutable(QStringLiteral("playerctl"));
-        if (!playerctl.isEmpty()) {
-            QProcess proc;
-            proc.start(playerctl, {QStringLiteral("-a"), QStringLiteral("metadata"), QStringLiteral("--format"),
-                                   QStringLiteral("{{status}}\t{{playerName}}\t{{title}}\t{{artist}}\t{{album}}\t{{xesam:url}}\t{{mpris:artUrl}}")});
-            if (proc.waitForFinished(500) && proc.exitCode() == 0) {
-                const QStringList lines = QString::fromUtf8(proc.readAllStandardOutput()).split(QLatin1Char('\n'), Qt::SkipEmptyParts);
-                for (const QString &l : lines) {
-                    const QVariantMap parsed = parsePlayerctlLine(l);
-                    if (parsed.isEmpty()) continue;
-                    const bool pl = parsed.value(QStringLiteral("playing")).toBool();
-                    const QString t = parsed.value(QStringLiteral("title")).toString();
-                    if (pl || (newTitle.isEmpty() && !t.isEmpty())) {
-                        foundPlaying = pl;
-                        newTitle = t;
-                        newArtist = parsed.value(QStringLiteral("artist")).toString();
-                        newAlbum = parsed.value(QStringLiteral("album")).toString();
-                        newMediaUrl = parsed.value(QStringLiteral("url")).toString();
-                        newRawArtUrl = parsed.value(QStringLiteral("artUrl")).toString();
-                        newPlayer = parsed.value(QStringLiteral("player")).toString();
-                        if (foundPlaying) break;
-                    }
-                }
-            }
-        }
-    }
-
-    bool detectedIsVideo = false;
-    const QString resolvedArt = newTitle.isEmpty()
-        ? QString()
-        : resolveCoverArtOrVideoThumbnail(newRawArtUrl, newMediaUrl, &detectedIsVideo);
-
-    const bool changed = (m_mediaPlaying != foundPlaying || m_trackTitle != newTitle
-                          || m_trackArtist != newArtist || m_playerName != newPlayer
-                          || m_trackArtUrl != resolvedArt || m_isVideoMedia != detectedIsVideo
-                          || m_trackPositionSecs != newPosSecs || m_trackDurationSecs != newDurSecs
-                          || m_shuffleEnabled != newShuffle || m_loopStatus != newLoop);
-    m_mediaPlaying = foundPlaying;
-    m_trackTitle = newTitle;
-    m_trackArtist = newArtist;
-    m_trackAlbum = newAlbum;
-    m_trackArtUrl = resolvedArt;
-    m_trackObjectId = newObjectId;
-    m_isVideoMedia = detectedIsVideo;
-    m_playerName = newPlayer;
-    m_activeMprisService = chosenService;
-    m_trackPositionSecs = newPosSecs;
-    m_trackDurationSecs = newDurSecs;
-    m_shuffleEnabled = newShuffle;
-    m_loopStatus = newLoop;
-
-    const bool shouldMonitorAudio = m_mediaPlaying || (m_songRecognizer && m_songRecognizer->listening());
-    if (shouldMonitorAudio) {
-        startPipeWireSpectrumMonitor();
-    } else {
-        stopPipeWireSpectrumMonitor();
-    }
-
-    if (changed) {
-        Q_EMIT mediaStateChanged();
-    }
-}
-
-void KIslandApplet::startPipeWireSpectrumMonitor()
-{
-    if (m_pwMonitorProc) {
-        if (m_pwMonitorProc->state() != QProcess::NotRunning) {
-            return;
-        }
-        m_pwMonitorProc->deleteLater();
-        m_pwMonitorProc = nullptr;
-    }
-
-    const QString pwRecord = QStandardPaths::findExecutable(QStringLiteral("pw-record"));
-    const QString parec = QStandardPaths::findExecutable(QStringLiteral("parec"));
-    if (pwRecord.isEmpty() && parec.isEmpty()) return;
-
-    m_pwMonitorProc = new QProcess(this);
-    connect(m_pwMonitorProc, &QProcess::readyReadStandardOutput, this, &KIslandApplet::onPipeWireAudioChunk);
-
-    if (!pwRecord.isEmpty()) {
-        // Native PipeWire output sink monitor capture (respects EasyEffects chain)
-        QStringList args;
-        args << QStringLiteral("--raw")
-             << QStringLiteral("--format=s16")
-             << QStringLiteral("--rate=8000")
-             << QStringLiteral("--channels=1")
-             << QStringLiteral("-P") << QStringLiteral("{\"target.object\":\"@DEFAULT_SINK@\",\"stream.capture.sink\":true}")
-             << QStringLiteral("-");
-        m_pwMonitorProc->start(pwRecord, args);
-    } else {
-        // Fallback to parec for PulseAudio / PipeWire-Pulse compatibility
-        QStringList args;
-        args << QStringLiteral("-d") << QStringLiteral("@DEFAULT_MONITOR@")
-             << QStringLiteral("--rate=8000")
-             << QStringLiteral("--channels=1")
-             << QStringLiteral("--format=s16le");
-        m_pwMonitorProc->start(parec, args);
-    }
-}
-
-void KIslandApplet::stopPipeWireSpectrumMonitor()
-{
-    if (m_pwMonitorProc) {
-        disconnect(m_pwMonitorProc, nullptr, this, nullptr);
-        if (m_pwMonitorProc->state() != QProcess::NotRunning) {
-            m_pwMonitorProc->terminate();
-            if (!m_pwMonitorProc->waitForFinished(400)) {
-                m_pwMonitorProc->kill();
-            }
-        }
-        m_pwMonitorProc->deleteLater();
-        m_pwMonitorProc = nullptr;
-    }
-    m_audioPcmBuffer.clear();
-    m_spectrumBars = {0.15, 0.15, 0.15, 0.15, 0.15, 0.15};
-    Q_EMIT spectrumChanged();
-}
-
-void KIslandApplet::onPipeWireAudioChunk()
-{
-    if (!m_pwMonitorProc) return;
-    const QByteArray chunk = m_pwMonitorProc->readAllStandardOutput();
-    if (chunk.isEmpty()) return;
-
-    m_audioPcmBuffer.append(chunk);
-
-    // 256 samples of 16-bit PCM = 512 bytes (32ms of audio at 8000 Hz)
-    constexpr int CHUNK_BYTES = 512;
-    if (m_audioPcmBuffer.size() >= CHUNK_BYTES) {
-        const QByteArray latestChunk = m_audioPcmBuffer.right(CHUNK_BYTES);
-        if (m_audioPcmBuffer.size() > 1024) {
-            m_audioPcmBuffer = m_audioPcmBuffer.right(CHUNK_BYTES);
-        }
-        m_spectrumBars = computeSpectrumBarsFromPcm(latestChunk, 6);
-        Q_EMIT spectrumChanged();
-    }
-}
-
-void KIslandApplet::playPauseMedia()
-{
-    if (m_activeMprisService.isEmpty()) return;
-    QDBusInterface iface(m_activeMprisService,
-                         QStringLiteral("/org/mpris/MediaPlayer2"),
-                         QStringLiteral("org.mpris.MediaPlayer2.Player"),
-                         QDBusConnection::sessionBus());
-    iface.asyncCall(QStringLiteral("PlayPause"));
-    QTimer::singleShot(250, this, &KIslandApplet::pollMprisAndActivities);
-}
-
-void KIslandApplet::nextTrack()
-{
-    if (m_activeMprisService.isEmpty()) return;
-    QDBusInterface iface(m_activeMprisService,
-                         QStringLiteral("/org/mpris/MediaPlayer2"),
-                         QStringLiteral("org.mpris.MediaPlayer2.Player"),
-                         QDBusConnection::sessionBus());
-    iface.asyncCall(QStringLiteral("Next"));
-    QTimer::singleShot(350, this, &KIslandApplet::pollMprisAndActivities);
-}
-
-void KIslandApplet::previousTrack()
-{
-    if (m_activeMprisService.isEmpty()) return;
-    QDBusInterface iface(m_activeMprisService,
-                         QStringLiteral("/org/mpris/MediaPlayer2"),
-                         QStringLiteral("org.mpris.MediaPlayer2.Player"),
-                         QDBusConnection::sessionBus());
-    iface.asyncCall(QStringLiteral("Previous"));
-    QTimer::singleShot(350, this, &KIslandApplet::pollMprisAndActivities);
-}
-
-void KIslandApplet::seekToRatio(double ratio)
-{
-    if (m_activeMprisService.isEmpty() || m_trackDurationSecs <= 0) return;
-    const double clamped = qBound(0.0, ratio, 1.0);
-    const qint64 targetSecs = qRound64(clamped * static_cast<double>(m_trackDurationSecs));
-    const qint64 targetMicros = targetSecs * 1000000LL;
-
-    if (!m_trackObjectId.isEmpty()) {
-        QDBusMessage msg = QDBusMessage::createMethodCall(
-            m_activeMprisService,
-            QStringLiteral("/org/mpris/MediaPlayer2"),
-            QStringLiteral("org.mpris.MediaPlayer2.Player"),
-            QStringLiteral("SetPosition"));
-        msg << QVariant::fromValue(QDBusObjectPath(m_trackObjectId)) << targetMicros;
-        QDBusConnection::sessionBus().asyncCall(msg);
-    } else {
-        const qint64 offsetMicros = (targetSecs - m_trackPositionSecs) * 1000000LL;
-        QDBusInterface iface(m_activeMprisService,
-                             QStringLiteral("/org/mpris/MediaPlayer2"),
-                             QStringLiteral("org.mpris.MediaPlayer2.Player"),
-                             QDBusConnection::sessionBus());
-        iface.asyncCall(QStringLiteral("Seek"), offsetMicros);
-    }
-
-    m_trackPositionSecs = targetSecs;
-    Q_EMIT mediaStateChanged();
-    QTimer::singleShot(250, this, &KIslandApplet::pollMprisAndActivities);
-}
-
-void KIslandApplet::skipBySeconds(int deltaSeconds)
-{
-    if (m_activeMprisService.isEmpty()) return;
-    const qint64 offsetMicros = static_cast<qint64>(deltaSeconds) * 1000000LL;
-    QDBusInterface iface(m_activeMprisService,
-                         QStringLiteral("/org/mpris/MediaPlayer2"),
-                         QStringLiteral("org.mpris.MediaPlayer2.Player"),
-                         QDBusConnection::sessionBus());
-    iface.asyncCall(QStringLiteral("Seek"), offsetMicros);
-    QTimer::singleShot(250, this, &KIslandApplet::pollMprisAndActivities);
-}
-
-void KIslandApplet::toggleShuffle()
-{
-    if (m_activeMprisService.isEmpty()) return;
-    const bool nextState = !m_shuffleEnabled;
-    QDBusMessage msg = QDBusMessage::createMethodCall(
-        m_activeMprisService,
-        QStringLiteral("/org/mpris/MediaPlayer2"),
-        QStringLiteral("org.freedesktop.DBus.Properties"),
-        QStringLiteral("Set"));
-    msg << QStringLiteral("org.mpris.MediaPlayer2.Player")
-        << QStringLiteral("Shuffle")
-        << QVariant::fromValue(QDBusVariant(nextState));
-    QDBusConnection::sessionBus().asyncCall(msg);
-    m_shuffleEnabled = nextState;
-    Q_EMIT mediaStateChanged();
-}
-
-void KIslandApplet::cycleLoopStatus()
-{
-    if (m_activeMprisService.isEmpty()) return;
-    QString nextLoop = QStringLiteral("None");
-    if (m_loopStatus == QStringLiteral("None")) {
-        nextLoop = QStringLiteral("Playlist");
-    } else if (m_loopStatus == QStringLiteral("Playlist")) {
-        nextLoop = QStringLiteral("Track");
-    }
-    QDBusMessage msg = QDBusMessage::createMethodCall(
-        m_activeMprisService,
-        QStringLiteral("/org/mpris/MediaPlayer2"),
-        QStringLiteral("org.freedesktop.DBus.Properties"),
-        QStringLiteral("Set"));
-    msg << QStringLiteral("org.mpris.MediaPlayer2.Player")
-        << QStringLiteral("LoopStatus")
-        << QVariant::fromValue(QDBusVariant(nextLoop));
-    QDBusConnection::sessionBus().asyncCall(msg);
-    m_loopStatus = nextLoop;
-    Q_EMIT mediaStateChanged();
-}
-
-void KIslandApplet::raiseMediaPlayer()
-{
-    if (!m_activeMprisService.isEmpty()) {
-        QDBusInterface iface(m_activeMprisService,
-                             QStringLiteral("/org/mpris/MediaPlayer2"),
-                             QStringLiteral("org.mpris.MediaPlayer2"),
-                             QDBusConnection::sessionBus());
-        iface.asyncCall(QStringLiteral("Raise"));
-    }
-
-    // Many players (including mpv-mpris on Wayland) report CanRaise=false.
-    // Use KWin Wayland's native Scripting D-Bus API to unminimize & activate the player window.
-    const QString target = m_playerName.trimmed().toLower();
-    if (target.isEmpty()) return;
-
-    const QString scriptPath = QDir::tempPath() + QStringLiteral("/kisland_kwin_raise.js");
-    QFile f(scriptPath);
-    if (f.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
-        const QString js = QStringLiteral(
-            "const target = \"%1\";\n"
-            "for (const w of workspace.windowList()) {\n"
-            "    const rc = (w.resourceClass || \"\").toString().toLowerCase();\n"
-            "    const rn = (w.resourceName || \"\").toString().toLowerCase();\n"
-            "    const df = (w.desktopFileName || \"\").toString().toLowerCase();\n"
-            "    const cap = (w.caption || \"\").toString().toLowerCase();\n"
-            "    if (rc.includes(target) || rn.includes(target) || df.includes(target) || cap.includes(target)) {\n"
-            "        if (w.minimized) w.minimized = false;\n"
-            "        workspace.activeWindow = w;\n"
-            "        break;\n"
-            "    }\n"
-            "}\n").arg(target);
-        f.write(js.toUtf8());
-        f.close();
-
-        QDBusInterface kwinScripting(QStringLiteral("org.kde.KWin"),
-                                     QStringLiteral("/Scripting"),
-                                     QStringLiteral("org.kde.kwin.Scripting"),
-                                     QDBusConnection::sessionBus());
-        if (kwinScripting.isValid()) {
-            const QString pluginName = QStringLiteral("kisland_raise_helper");
-            kwinScripting.call(QStringLiteral("unloadScript"), pluginName);
-            const QDBusReply<int> loadReply = kwinScripting.call(QStringLiteral("loadScript"), scriptPath, pluginName);
-            if (loadReply.isValid() && loadReply.value() >= 0) {
-                const QString scriptObjPath = QStringLiteral("/Scripting/Script%1").arg(loadReply.value());
-                QDBusInterface scriptIface(QStringLiteral("org.kde.KWin"),
-                                           scriptObjPath,
-                                           QStringLiteral("org.kde.kwin.Script"),
-                                           QDBusConnection::sessionBus());
-                scriptIface.call(QStringLiteral("run"));
-                kwinScripting.call(QStringLiteral("unloadScript"), pluginName);
-            }
-        }
-    }
-}
-
-void KIslandApplet::startQuickTimer(int durationSeconds, const QString &label)
-{
-    if (durationSeconds <= 0) return;
-    m_timerTotalSecs = durationSeconds;
-    m_timerPausedRemainingSecs = durationSeconds;
-    m_timerPaused = false;
-    m_timerTarget = QDateTime::currentDateTime().addSecs(durationSeconds);
-    m_timerLabel = label;
-    m_timerActive = true;
-    m_timerRemainingText = formatCountdown(durationSeconds);
-    m_countdownTimer->start(1000);
-    Q_EMIT timerChanged();
-}
-
-void KIslandApplet::togglePauseTimer()
-{
-    if (!m_timerActive) return;
-    if (!m_timerPaused) {
-        m_timerPausedRemainingSecs = qMax<qint64>(1, QDateTime::currentDateTime().secsTo(m_timerTarget));
-        m_timerPaused = true;
-        m_countdownTimer->stop();
-    } else {
-        m_timerTarget = QDateTime::currentDateTime().addSecs(m_timerPausedRemainingSecs);
-        m_timerPaused = false;
-        m_countdownTimer->start(1000);
-    }
-    Q_EMIT timerChanged();
-}
-
-void KIslandApplet::cancelQuickTimer()
-{
-    m_countdownTimer->stop();
-    m_timerActive = false;
-    m_timerPaused = false;
-    m_timerTotalSecs = 0;
-    m_timerPausedRemainingSecs = 0;
-    m_timerRemainingText.clear();
-    Q_EMIT timerChanged();
-}
-
-void KIslandApplet::onTimerTick()
-{
-    if (!m_timerActive || m_timerPaused) return;
-    const qint64 rem = QDateTime::currentDateTime().secsTo(m_timerTarget);
-    if (rem <= 0) {
-        const QString finishedLabel = m_timerLabel.isEmpty() ? i18n("Temporizador") : m_timerLabel;
-        const qint64 totalSecs = m_timerTotalSecs;
-        cancelQuickTimer();
-
-        // 1. Play official macOS timer/alarm sound via PipeWire
-        QString alarmSound = QStandardPaths::locate(QStandardPaths::GenericDataLocation, QStringLiteral("sounds/macOS-GoldenGate/stereo/alarm-clock-elapsed.oga"));
-        if (alarmSound.isEmpty()) {
-            alarmSound = QStringLiteral("/usr/share/sounds/macOS-GoldenGate/stereo/alarm-clock-elapsed.oga");
-        }
-        if (QFile::exists(alarmSound)) {
-            QProcess::startDetached(QStringLiteral("pw-play"), {alarmSound});
-        }
-
-        // 2. Desktop notification via org.freedesktop.Notifications
-        QDBusMessage msg = QDBusMessage::createMethodCall(
-            QStringLiteral("org.freedesktop.Notifications"),
-            QStringLiteral("/org/freedesktop/Notifications"),
-            QStringLiteral("org.freedesktop.Notifications"),
-            QStringLiteral("Notify")
-        );
-        QVariantMap hints;
-        hints.insert(QStringLiteral("desktop-entry"), QStringLiteral("org.kde.plasmashell"));
-        hints.insert(QStringLiteral("category"), QStringLiteral("timer"));
-        hints.insert(QStringLiteral("urgency"), uchar(2)); // High urgency
-
-        msg << QStringLiteral("KIsland")
-            << 0u
-            << QStringLiteral("chronometer")
-            << i18n("¡Se acabó el tiempo!")
-            << finishedLabel
-            << QStringList()
-            << hints
-            << -1;
-
-        QDBusConnection::sessionBus().asyncCall(msg);
-
-        // 3. Emit timerFinished signal so QML Dynamic Island shows amber HUD alert
-        Q_EMIT timerFinished(finishedLabel, totalSecs);
-        return;
-    }
-    m_timerRemainingText = formatCountdown(rem);
-    Q_EMIT timerChanged();
-}
-
-void KIslandApplet::invokeKity()
-{
-    const QString kityBin = QStandardPaths::findExecutable(QStringLiteral("kity"),
-                                                           {QDir::homePath() + QStringLiteral("/.local/bin"),
-                                                            QStringLiteral("/usr/local/bin"),
-                                                            QStringLiteral("/usr/bin")});
-    if (kityBin.isEmpty()) {
-        qWarning() << "KIsland: kity executable not found";
-        return;
-    }
-
-    // Launch through KIO so that, on Wayland, an XDG activation token is requested
-    // and forwarded (via KDBusService) to the already running Kity instance.
-    // Without it KWin's focus-stealing prevention keeps the window behind others.
-    auto *job = new KIO::CommandLauncherJob(kityBin, {QStringLiteral("-t")});
-    job->setDesktopName(QStringLiteral("org.cesar.kity"));
-    job->start();
-}
-
-void KIslandApplet::invokeKiriVoice()
-{
-    invokeKity();
-}
-
-void KIslandApplet::setOutputVolume(int percent)
-{
-    const int clamped = qBound(0, percent, 150);
-    const QString wpctl = QStandardPaths::findExecutable(QStringLiteral("wpctl"));
-    if (!wpctl.isEmpty()) {
-        const QString ratioStr = QString::number(clamped / 100.0, 'f', 2);
-        QProcess::startDetached(wpctl, {QStringLiteral("set-volume"), QStringLiteral("@DEFAULT_AUDIO_SINK@"), ratioStr});
-    }
-    if (m_outputVolumePercent != clamped) {
-        m_outputVolumePercent = clamped;
-        Q_EMIT audioChanged();
-        Q_EMIT volumeAlert(m_outputVolumePercent, m_outputMuted);
-    }
-}
-
-void KIslandApplet::toggleOutputMute()
-{
-    const QString wpctl = QStandardPaths::findExecutable(QStringLiteral("wpctl"));
-    if (!wpctl.isEmpty()) {
-        QProcess::startDetached(wpctl, {QStringLiteral("set-mute"), QStringLiteral("@DEFAULT_AUDIO_SINK@"), QStringLiteral("toggle")});
-    }
-    m_outputMuted = !m_outputMuted;
-    Q_EMIT audioChanged();
-    Q_EMIT volumeAlert(m_outputVolumePercent, m_outputMuted);
-}
-
-void KIslandApplet::launchDropover()
-{
-    const QString bin = QStandardPaths::findExecutable(QStringLiteral("kdropover"),
-                                                       {QDir::homePath() + QStringLiteral("/.local/bin"), QStringLiteral("/usr/local/bin"), QStringLiteral("/usr/bin")});
-    if (!bin.isEmpty()) {
-        QProcess::startDetached(bin, {});
-    }
-}
-
-void KIslandApplet::launchLiveCaptions()
-{
-    const QString bin = QStandardPaths::findExecutable(QStringLiteral("klivecaptions"),
-                                                       {QDir::homePath() + QStringLiteral("/.local/bin"), QStringLiteral("/usr/local/bin"), QStringLiteral("/usr/bin")});
-    if (!bin.isEmpty()) {
-        QProcess::startDetached(bin, {});
-    }
-}
-
-void KIslandApplet::updatePipeWireAudioAndPrivacy()
-{
-    const QString wpctl = QStandardPaths::findExecutable(QStringLiteral("wpctl"));
-    if (wpctl.isEmpty()) return;
-
-    QProcess proc;
-    proc.start(wpctl, {QStringLiteral("status")});
-    if (!proc.waitForFinished(450) || proc.exitCode() != 0) {
-        return;
-    }
-
-    const QVariantMap parsed = parseWpctlStatus(QString::fromUtf8(proc.readAllStandardOutput()), m_kityState);
-    const int newVol = parsed.value(QStringLiteral("volumePercent"), m_outputVolumePercent).toInt();
-    const bool newMuted = parsed.value(QStringLiteral("muted"), m_outputMuted).toBool();
-    const QString newDev = parsed.value(QStringLiteral("deviceName"), m_outputDeviceName).toString();
-
-    if (m_outputVolumePercent != newVol || m_outputMuted != newMuted || m_outputDeviceName != newDev) {
-        const bool volChanged = (m_outputVolumePercent != newVol || m_outputMuted != newMuted);
-        m_outputVolumePercent = newVol;
-        m_outputMuted = newMuted;
-        m_outputDeviceName = newDev;
-        Q_EMIT audioChanged();
-        if (m_volumeInitialized && volChanged) {
-            Q_EMIT volumeAlert(m_outputVolumePercent, m_outputMuted);
-        }
-    }
-    m_volumeInitialized = true;
-
-    const bool newMic = parsed.value(QStringLiteral("micActive")).toBool();
-    const QString newMicApp = parsed.value(QStringLiteral("micApp")).toString();
-    bool newCam = parsed.value(QStringLiteral("cameraOrScreenActive")).toBool();
-    QString newCamApp = parsed.value(QStringLiteral("cameraOrScreenApp")).toString();
-
-    // Also detect direct V4L2 webcam usage (/dev/video*) in /proc/<pid>/fd for apps not routing video via PipeWire
-    if (!newCam) {
-        const QDir procDir(QStringLiteral("/proc"));
-        const QStringList pids = procDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
-        for (const QString &pidStr : pids) {
-            bool ok = false;
-            pidStr.toInt(&ok);
-            if (!ok) continue;
-
-            const QDir fdDir(QStringLiteral("/proc/%1/fd").arg(pidStr));
-            const QFileInfoList fds = fdDir.entryInfoList(QDir::System | QDir::Files | QDir::NoDotAndDotDot);
-            for (const QFileInfo &fdInfo : fds) {
-                const QString target = fdInfo.symLinkTarget();
-                if (target.startsWith(QStringLiteral("/dev/video"))) {
-                    QFile commFile(QStringLiteral("/proc/%1/comm").arg(pidStr));
-                    QString comm;
-                    if (commFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-                        comm = QString::fromUtf8(commFile.readLine()).trimmed();
-                    }
-                    if (!comm.isEmpty()
-                        && comm != QStringLiteral("pipewire")
-                        && comm != QStringLiteral("wireplumber")
-                        && comm != QStringLiteral("xdg-desktop-por")) {
-                        newCam = true;
-                        newCamApp = comm;
-                        break;
-                    }
-                }
-            }
-            if (newCam) break;
-        }
-    }
-
-    if (m_micActive != newMic || m_micApp != newMicApp
-        || m_cameraOrScreenActive != newCam || m_cameraOrScreenApp != newCamApp) {
-        m_micActive = newMic;
-        m_micApp = newMicApp;
-        m_cameraOrScreenActive = newCam;
-        m_cameraOrScreenApp = newCamApp;
-        Q_EMIT privacyChanged();
-    }
-}
-
-void KIslandApplet::updateSystemVitals()
-{
-    // CPU utilization delta from /proc/stat
-    QFile statFile(QStringLiteral("/proc/stat"));
-    if (statFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        const QString line = QString::fromUtf8(statFile.readLine()).simplified();
-        const QStringList parts = line.split(QLatin1Char(' '));
-        if (parts.size() >= 5) {
-            qint64 user = parts.at(1).toLongLong();
-            qint64 nice = parts.at(2).toLongLong();
-            qint64 sys = parts.at(3).toLongLong();
-            qint64 idle = parts.at(4).toLongLong();
-            qint64 iowait = parts.value(5).toLongLong();
-            const qint64 total = user + nice + sys + idle + iowait;
-            const qint64 totalDelta = total - m_prevCpuTotal;
-            const qint64 idleDelta = idle - m_prevCpuIdle;
-            if (m_prevCpuTotal > 0 && totalDelta > 0) {
-                m_cpuUsagePercent = qBound(0, static_cast<int>(100 * (totalDelta - idleDelta) / totalDelta), 100);
-            }
-            m_prevCpuTotal = total;
-            m_prevCpuIdle = idle;
-        }
-    }
-
-    // RAM utilization from /proc/meminfo
-    QFile memFile(QStringLiteral("/proc/meminfo"));
-    if (memFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        qint64 totalKb = 0;
-        qint64 availKb = 0;
-        const QStringList lines = QString::fromUtf8(memFile.readAll()).split(QLatin1Char('\n'));
-        for (const QString &l : lines) {
-            if (l.startsWith(QStringLiteral("MemTotal:"))) {
-                totalKb = l.simplified().section(QLatin1Char(' '), 1, 1).toLongLong();
-            } else if (l.startsWith(QStringLiteral("MemAvailable:"))) {
-                availKb = l.simplified().section(QLatin1Char(' '), 1, 1).toLongLong();
-            }
-        }
-        if (totalKb > 0) {
-            m_ramUsagePercent = qBound(0, static_cast<int>(100 * (totalKb - availKb) / totalKb), 100);
-        }
-    }
-    Q_EMIT vitalsChanged();
-}
-
-QVariantList KIslandApplet::getKdeConnectDevices() const
-{
-    QVariantList list;
-
-    // First try D-Bus interface of KDE Connect daemon
-    QDBusInterface iface(QStringLiteral("org.kde.kdeconnect"),
-                         QStringLiteral("/modules/kdeconnect"),
-                         QStringLiteral("org.kde.kdeconnect.daemon"),
-                         QDBusConnection::sessionBus());
-    if (iface.isValid()) {
-        const QDBusReply<QMap<QString, QString>> reply = iface.call(QStringLiteral("deviceNames"), true, true);
-        if (reply.isValid()) {
-            const auto map = reply.value();
-            for (auto it = map.constBegin(); it != map.constEnd(); ++it) {
-                QVariantMap d;
-                d[QStringLiteral("id")] = it.key();
-                d[QStringLiteral("name")] = it.value();
-                list.append(d);
-            }
-            if (!list.isEmpty()) {
-                return list;
-            }
-        }
-    }
-
-    // Fallback: query kdeconnect-cli -a --id-name-only
-    const QString kdecli = QStandardPaths::findExecutable(QStringLiteral("kdeconnect-cli"));
-    if (!kdecli.isEmpty()) {
-        QProcess proc;
-        proc.start(kdecli, {QStringLiteral("-a"), QStringLiteral("--id-name-only")});
-        if (proc.waitForFinished(1000) && proc.exitCode() == 0) {
-            const QString out = QString::fromUtf8(proc.readAllStandardOutput());
-            const QStringList lines = out.split(QLatin1Char('\n'), Qt::SkipEmptyParts);
-            for (const QString &line : lines) {
-                const QString trimmed = line.trimmed();
-                const int spaceIdx = trimmed.indexOf(QLatin1Char(' '));
-                if (spaceIdx > 0) {
-                    QVariantMap d;
-                    d[QStringLiteral("id")] = trimmed.left(spaceIdx);
-                    d[QStringLiteral("name")] = trimmed.mid(spaceIdx + 1).trimmed();
-                    list.append(d);
-                }
-            }
-        }
-    }
-
-    return list;
-}
-
-bool KIslandApplet::shareToKdeConnect(const QString &filePath, const QString &deviceId)
-{
-    QString cleanPath = filePath;
-    if (cleanPath.startsWith(QStringLiteral("file://"))) {
-        cleanPath = QUrl(cleanPath).toLocalFile();
-    }
-    if (cleanPath.isEmpty() || !QFileInfo::exists(cleanPath)) {
-        return false;
-    }
-
-    const QString kdecli = QStandardPaths::findExecutable(QStringLiteral("kdeconnect-cli"));
-    if (kdecli.isEmpty()) {
-        return false;
-    }
-
-    QStringList args;
-    args << QStringLiteral("--share") << cleanPath;
-    if (!deviceId.isEmpty()) {
-        args << QStringLiteral("-d") << deviceId;
-    }
-
-    return QProcess::startDetached(kdecli, args);
-}
-
-void KIslandApplet::openKdeConnectSettings()
-{
-    const QString app = QStandardPaths::findExecutable(QStringLiteral("kdeconnect-app"));
-    if (!app.isEmpty()) {
-        QProcess::startDetached(app, {});
-    }
-}
-
-void KIslandApplet::openFileLocation(const QString &filePath)
-{
-    QString cleanPath = filePath;
-    if (cleanPath.startsWith(QStringLiteral("file://"))) {
-        cleanPath = QUrl(cleanPath).toLocalFile();
-    }
-    if (cleanPath.isEmpty()) {
-        return;
-    }
-
-    const QFileInfo fi(cleanPath);
-    if (!fi.exists()) {
-        return;
-    }
-
-    const QString dolphin = QStandardPaths::findExecutable(QStringLiteral("dolphin"));
-    if (!dolphin.isEmpty()) {
-        QProcess::startDetached(dolphin, {QStringLiteral("--select"), fi.absoluteFilePath()});
-    } else {
-        QDesktopServices::openUrl(QUrl::fromLocalFile(fi.absolutePath()));
-    }
-}
-
-void KIslandApplet::toggleFocusDnd()
-{
-    QDBusInterface focusIface(QStringLiteral("org.cesar.kfocus"),
-                              QStringLiteral("/KFocus"),
-                              QStringLiteral("org.cesar.kfocus"),
-                              QDBusConnection::sessionBus());
-    if (focusIface.isValid()) {
-        focusIface.asyncCall(QStringLiteral("toggleDnd"));
-        QTimer::singleShot(200, this, &KIslandApplet::updateFocusMode);
-        return;
-    }
-
-    QDBusInterface notifIface(QStringLiteral("org.freedesktop.Notifications"),
-                              QStringLiteral("/org/freedesktop/Notifications"),
-                              QStringLiteral("org.freedesktop.Notifications"),
-                              QDBusConnection::sessionBus());
-    if (notifIface.isValid()) {
-        const bool isInhibited = notifIface.property("Inhibited").toBool();
-        if (isInhibited) {
-            notifIface.call(QStringLiteral("UnInhibit"), 1u);
-        } else {
-            notifIface.call(QStringLiteral("Inhibit"), QStringLiteral("org.cesar.kisland"), QStringLiteral("Modo no molestar"), QVariantMap());
-        }
-    }
-
-    QTimer::singleShot(200, this, &KIslandApplet::updateFocusMode);
-}
-
-void KIslandApplet::updateBluetoothAndPeripherals()
-{
-    const QString btctl = QStandardPaths::findExecutable(QStringLiteral("bluetoothctl"));
-    if (btctl.isEmpty()) return;
-
-    QProcess proc;
-    proc.start(btctl, {QStringLiteral("devices"), QStringLiteral("Connected")});
-    if (!proc.waitForFinished(800) || proc.exitCode() != 0) {
-        return;
-    }
-
-    const QString out = QString::fromUtf8(proc.readAllStandardOutput());
-    const QStringList lines = out.split(QLatin1Char('\n'), Qt::SkipEmptyParts);
-    QSet<QString> currentDevices;
-
-    for (const QString &line : lines) {
-        const QString trimmed = line.trimmed();
-        if (!trimmed.startsWith(QStringLiteral("Device "))) continue;
-        const QStringList parts = trimmed.split(QLatin1Char(' '), Qt::SkipEmptyParts);
-        if (parts.size() < 3) continue;
-
-        const QString mac = parts.at(1);
-        const QString name = parts.mid(2).join(QLatin1Char(' '));
-        currentDevices.insert(mac);
-
-        if (m_btInitialized && !m_knownBtDevices.contains(mac)) {
-            int batteryPercent = -1;
-            QString iconName = QStringLiteral("audio-headphones");
-            const QString lowerName = name.toLower();
-            if (lowerName.contains(QStringLiteral("speaker")) || lowerName.contains(QStringLiteral("xb13")) || lowerName.contains(QStringLiteral("altavoz"))) {
-                iconName = QStringLiteral("audio-speakers");
-            } else if (lowerName.contains(QStringLiteral("mouse")) || lowerName.contains(QStringLiteral("ratón"))) {
-                iconName = QStringLiteral("input-mouse");
-            } else if (lowerName.contains(QStringLiteral("keyboard")) || lowerName.contains(QStringLiteral("teclado"))) {
-                iconName = QStringLiteral("input-keyboard");
-            }
-
-            QProcess infoProc;
-            infoProc.start(btctl, {QStringLiteral("info"), mac});
-            if (infoProc.waitForFinished(600) && infoProc.exitCode() == 0) {
-                const QString infoOut = QString::fromUtf8(infoProc.readAllStandardOutput());
-                static const QRegularExpression rxBattery(QStringLiteral(R"(Battery Percentage:\s*(?:0x[0-9a-fA-F]+\s*)?\(?(\d+)\)?)"));
-                const auto match = rxBattery.match(infoOut);
-                if (match.hasMatch()) {
-                    batteryPercent = match.captured(1).toInt();
-                }
-            }
-
-            QString subtitle = QStringLiteral("Conectado");
-            if (batteryPercent >= 0) {
-                subtitle = QStringLiteral("Conectado • %1%").arg(batteryPercent);
-            }
-            Q_EMIT peripheralAlert(name, subtitle, iconName);
-        }
-    }
-
-    m_knownBtDevices = currentDevices;
-    m_btInitialized = true;
-}
-
-void KIslandApplet::updateFocusMode()
-{
-    bool newActive = false;
-    bool newDnd = false;
-    QString newModeName;
-    QString newModeIcon;
-    QString newModeId;
-
-    const QString configPath = QDir::homePath() + QStringLiteral("/.config/kfocus/active_mode.json");
-    QFile f(configPath);
-    if (f.exists() && f.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        const QJsonDocument doc = QJsonDocument::fromJson(f.readAll());
-        if (doc.isObject()) {
-            const QJsonObject obj = doc.object();
-            newActive = obj.value(QStringLiteral("active")).toBool();
-            newDnd = obj.value(QStringLiteral("dndActive")).toBool();
-            newModeName = obj.value(QStringLiteral("modeName")).toString();
-            newModeIcon = obj.value(QStringLiteral("modeIcon")).toString();
-            newModeId = obj.value(QStringLiteral("modeId")).toString();
-        }
-    } else {
-        QDBusInterface notifIface(QStringLiteral("org.freedesktop.Notifications"),
-                                  QStringLiteral("/org/freedesktop/Notifications"),
-                                  QStringLiteral("org.freedesktop.Notifications"),
-                                  QDBusConnection::sessionBus());
-        if (notifIface.isValid()) {
-            newDnd = notifIface.property("Inhibited").toBool();
-            newActive = newDnd;
-            if (newDnd) {
-                newModeName = QStringLiteral("No molestar");
-                newModeIcon = QStringLiteral("notifications-disabled");
-            }
-        }
-    }
-
-    if (m_focusActive != newActive || m_focusDndActive != newDnd || m_focusModeName != newModeName || m_focusModeIcon != newModeIcon) {
-        const bool stateChanged = (m_focusActive != newActive || m_focusDndActive != newDnd);
-        m_focusActive = newActive;
-        m_focusDndActive = newDnd;
-        m_focusModeName = newModeName;
-        m_focusModeIcon = newModeIcon;
-        m_focusModeId = newModeId;
-        Q_EMIT focusStateChanged();
-
-        if (m_focusInitialized && stateChanged) {
-            QString alertTitle;
-            QString alertIcon = m_focusModeIcon.isEmpty() ? QStringLiteral("notifications-disabled") : m_focusModeIcon;
-            if (m_focusActive) {
-                alertTitle = m_focusModeName.isEmpty() ? QStringLiteral("Concentración activada") : QStringLiteral("Modo %1").arg(m_focusModeName);
-            } else if (m_focusDndActive) {
-                alertTitle = QStringLiteral("No molestar: Activado");
-            } else {
-                alertTitle = QStringLiteral("No molestar: Desactivado");
-                alertIcon = QStringLiteral("preferences-desktop-notification-bell");
-            }
-            Q_EMIT focusAlert(alertTitle, alertIcon);
-        }
-    }
-    m_focusInitialized = true;
-}
+K_PLUGIN_CLASS_WITH_JSON(KIslandApplet, "metadata.json")
 
 #include "kislandapplet.moc"

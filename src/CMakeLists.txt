@@ -1,19 +1,35 @@
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 add_definitions(-DTRANSLATION_DOMAIN=\"plasma_applet_org.cesar.kisland\")
 
-# Reusable, unit-testable modules (song recognition)
+# Reusable, unit-testable modules (media, timer, audio, privacy, vitals, system integration, song recognition)
 add_library(kisland_modules STATIC
     songrecognizer.cpp
     songrecognizer.h
+    core/mediaengine.cpp
+    core/mediaengine.h
+    core/timermanager.cpp
+    core/timermanager.h
+    system/audioprivacymanager.cpp
+    system/audioprivacymanager.h
+    system/systemvitalsmonitor.cpp
+    system/systemvitalsmonitor.h
+    system/systemintegrationservice.cpp
+    system/systemintegrationservice.h
 )
 set_target_properties(kisland_modules PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_include_directories(kisland_modules PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(kisland_modules PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/core
+    ${CMAKE_CURRENT_SOURCE_DIR}/system
+)
 target_link_libraries(kisland_modules PUBLIC
     Qt6::Core
+    Qt6::DBus
     Qt6::Gui
     Qt6::Network
     KF6::I18n
     KF6::Notifications
+    KF6::KIOGui
 )
 
 plasma_add_applet(org.cesar.kisland
@@ -23,6 +39,12 @@ plasma_add_applet(org.cesar.kisland
         qml/main.qml
         qml/config.qml
         qml/ConfigGeneral.qml
+        qml/IslandCompactPill.qml
+        qml/IslandExpandedHeader.qml
+        qml/IslandMediaCard.qml
+        qml/IslandMusicRecognitionCard.qml
+        qml/IslandTimerCard.qml
+        qml/IslandDropShelfCard.qml
     RESOURCES
         res/main.xml
 )

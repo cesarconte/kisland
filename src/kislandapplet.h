@@ -7,10 +7,13 @@
 
 #include <Plasma/Applet>
 #include <QDateTime>
-#include <QProcess>
-#include <QTimer>
 #include <QVariantList>
 
+class MediaEngine;
+class TimerManager;
+class AudioPrivacyManager;
+class SystemVitalsMonitor;
+class SystemIntegrationService;
 class SongRecognizer;
 
 class KIslandApplet : public Plasma::Applet
@@ -121,7 +124,7 @@ public:
     Q_INVOKABLE void openFileLocation(const QString &filePath);
     Q_INVOKABLE void toggleFocusDnd();
 
-    // Static helpers for unit testing
+    // Static helpers for unit testing and domain delegation
     static QVariantList computeSpectrumBarsFromPcm(const QByteArray &pcmChunk, int barCount = 6);
     static QString formatCountdown(qint64 remainingSeconds);
     static QVariantMap parsePlayerctlLine(const QString &line);
@@ -145,70 +148,14 @@ Q_SIGNALS:
     void focusAlert(const QString &title, const QString &icon);
 
 private Q_SLOTS:
-    void pollMprisAndActivities();
-    void onTimerTick();
-    void onPipeWireAudioChunk();
+    void pollActivities();
 
 private:
-    void startPipeWireSpectrumMonitor();
-    void stopPipeWireSpectrumMonitor();
-    void updateSystemVitals();
-    void updatePipeWireAudioAndPrivacy();
-    void updateBluetoothAndPeripherals();
-    void updateFocusMode();
-
-    bool m_mediaPlaying = false;
-    QString m_trackTitle;
-    QString m_trackArtist;
-    QString m_trackAlbum;
-    QString m_trackArtUrl;
-    QString m_trackObjectId;
-    bool m_isVideoMedia = false;
-    QString m_playerName;
-    QString m_activeMprisService;
-    qint64 m_trackPositionSecs = 0;
-    qint64 m_trackDurationSecs = 0;
-    bool m_shuffleEnabled = false;
-    QString m_loopStatus = QStringLiteral("None");
-
-    QVariantList m_spectrumBars = {0.15, 0.15, 0.15, 0.15, 0.15, 0.15};
-    QProcess *m_pwMonitorProc = nullptr;
-    QByteArray m_audioPcmBuffer;
-
-    bool m_timerActive = false;
-    bool m_timerPaused = false;
-    qint64 m_timerTotalSecs = 0;
-    qint64 m_timerPausedRemainingSecs = 0;
-    QDateTime m_timerTarget;
-    QString m_timerLabel;
-    QString m_timerRemainingText;
-
-    QString m_kityState = QStringLiteral("idle");
-    int m_cpuUsagePercent = 0;
-    int m_ramUsagePercent = 0;
-    qint64 m_prevCpuTotal = 0;
-    qint64 m_prevCpuIdle = 0;
-
-    int m_outputVolumePercent = 40;
-    bool m_outputMuted = false;
-    QString m_outputDeviceName = QStringLiteral("PipeWire");
-    bool m_micActive = false;
-    QString m_micApp;
-    bool m_cameraOrScreenActive = false;
-    QString m_cameraOrScreenApp;
-
+    MediaEngine *m_mediaEngine = nullptr;
+    TimerManager *m_timerManager = nullptr;
+    AudioPrivacyManager *m_audioPrivacyManager = nullptr;
+    SystemVitalsMonitor *m_vitalsMonitor = nullptr;
+    SystemIntegrationService *m_systemService = nullptr;
     SongRecognizer *m_songRecognizer = nullptr;
-
-    bool m_focusActive = false;
-    bool m_focusDndActive = false;
-    QString m_focusModeName;
-    QString m_focusModeIcon;
-    QString m_focusModeId;
-    QSet<QString> m_knownBtDevices;
-    bool m_btInitialized = false;
-    bool m_volumeInitialized = false;
-    bool m_focusInitialized = false;
-
     QTimer *m_pollTimer = nullptr;
-    QTimer *m_countdownTimer = nullptr;
 };
