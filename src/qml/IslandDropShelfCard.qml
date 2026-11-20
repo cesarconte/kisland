@@ -7,7 +7,6 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Layouts
-import org.kde.kirigami as Kirigami
 import CachyOS.UI
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.plasma.plasmoid
@@ -96,12 +95,10 @@ ColumnLayout {
                     anchors.centerIn: parent
                     spacing: 6
 
-                    Kirigami.Icon {
+                    CachyIcon {
                         Layout.alignment: Qt.AlignHCenter
-                        implicitWidth: 32
-                        implicitHeight: 32
-                        source: "folder-stash-symbolic"
-                        isMask: true
+                        size: 32
+                        name: "folder-stash-symbolic"
                         color: CachyPalette.textSecondary
                         opacity: 0.6
                     }
@@ -115,7 +112,7 @@ ColumnLayout {
 
                     PlasmaComponents3.Label {
                         Layout.alignment: Qt.AlignHCenter
-                        font: Kirigami.Theme.smallFont
+                        font.pixelSize: 11
                         opacity: 0.5
                         text: i18n("Retén archivos para moverlos entre aplicaciones o enviarlos con KDE Connect")
                     }
@@ -155,7 +152,7 @@ ColumnLayout {
                         Rectangle {
                             anchors.fill: parent
                             radius: CachyTheme.radiusSmall
-                            color: fileMouse.containsMouse ? Kirigami.Theme.hoverColor : CachyPalette.windowBackground
+                            color: fileMouse.containsMouse ? CachyPalette.cardBackgroundHover : CachyPalette.windowBackground
                             border.width: 1
                             border.color: fileMouse.drag.active ? CachyTheme.accentColor : CachyPalette.specularBorder
 
@@ -164,11 +161,11 @@ ColumnLayout {
                                 anchors.margins: 6
                                 spacing: 6
 
-                                Kirigami.Icon {
-                                    implicitWidth: 26
-                                    implicitHeight: 26
-                                    source: fileIcon
+                                CachyIcon {
+                                    size: 26
+                                    name: fileIcon
                                     Layout.alignment: Qt.AlignVCenter
+                                    colored: false
                                 }
 
                                 ColumnLayout {
@@ -180,13 +177,13 @@ ColumnLayout {
                                         Layout.fillWidth: true
                                         text: fileName
                                         font.weight: Font.Medium
-                                        font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                                        font.pixelSize: 11
                                         elide: Text.ElideMiddle
                                     }
 
                                     PlasmaComponents3.Label {
                                         text: i18n("Arrastra hacia afuera")
-                                        font.pixelSize: Math.max(9, Kirigami.Theme.smallFont.pixelSize - 2)
+                                        font.pixelSize: 9
                                         opacity: 0.6
                                     }
                                 }
@@ -261,10 +258,10 @@ ColumnLayout {
                 Layout.fillWidth: true
                 spacing: CachyTheme.spacingSmall
 
-                Kirigami.Icon {
-                    implicitWidth: 16
-                    implicitHeight: 16
-                    source: "kdeconnect"
+                CachyIcon {
+                    size: 16
+                    name: "kdeconnect"
+                    colored: false
                 }
 
                 CachyHeading {
@@ -275,7 +272,7 @@ ColumnLayout {
                 Item { Layout.fillWidth: true }
 
                 PlasmaComponents3.Label {
-                    font: Kirigami.Theme.smallFont
+                    font.pixelSize: 11
                     opacity: 0.6
                     text: airdropCard.kdeDevices.length > 0
                         ? (airdropCard.kdeDevices.length === 1
@@ -321,7 +318,7 @@ ColumnLayout {
             PlasmaComponents3.Label {
                 visible: airdropCard.kdeDevices.length === 0
                 Layout.fillWidth: true
-                font: Kirigami.Theme.smallFont
+                font.pixelSize: 11
                 opacity: 0.7
                 wrapMode: Text.WordWrap
                 text: i18n("Vincula tu teléfono o tableta con KDE Connect para transferir archivos al instante con un solo clic.")

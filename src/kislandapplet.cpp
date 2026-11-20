@@ -104,6 +104,7 @@ QVariantList KIslandApplet::spectrumBars() const { return m_mediaEngine->spectru
 // Timer Manager property getters
 bool KIslandApplet::timerActive() const { return m_timerManager->isActive(); }
 bool KIslandApplet::timerPaused() const { return m_timerManager->isPaused(); }
+bool KIslandApplet::timerRinging() const { return m_timerManager->isRinging(); }
 double KIslandApplet::timerProgress() const { return m_timerManager->progress(); }
 QString KIslandApplet::timerRemainingText() const { return m_timerManager->remainingText(); }
 QString KIslandApplet::timerLabel() const { return m_timerManager->label(); }
@@ -147,6 +148,7 @@ void KIslandApplet::startQuickTimer(int durationSeconds, const QString &label)
 }
 void KIslandApplet::togglePauseTimer() { m_timerManager->togglePauseTimer(); }
 void KIslandApplet::cancelQuickTimer() { m_timerManager->cancelQuickTimer(); }
+void KIslandApplet::dismissTimer() { m_timerManager->dismissTimer(); }
 
 // System & Integration actions
 void KIslandApplet::invokeKity() { m_systemService->invokeKity(); }

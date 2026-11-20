@@ -7,7 +7,6 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Layouts
-import org.kde.kirigami as Kirigami
 import CachyOS.UI
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.plasma.plasmoid
@@ -27,6 +26,7 @@ Item {
         || Plasmoid.mediaPlaying
         || Plasmoid.trackTitle.length > 0
         || Plasmoid.timerActive
+        || Plasmoid.timerRinging
         || Plasmoid.micActive
         || Plasmoid.cameraOrScreenActive
         || (Plasmoid.songRecognizer && (Plasmoid.songRecognizer.listening || Plasmoid.songRecognizer.recognizedActive))
@@ -77,8 +77,8 @@ Item {
         height: Math.max(18, parent.height)
         radius: height / 2
         color: "#000000"
-        border.width: rootPlasmoid.pillHudType === "timer_done" ? 2 : 1
-        border.color: rootPlasmoid.pillHudType === "timer_done" ? CachyTheme.warningColor : Qt.rgba(1, 1, 1, 0.15)
+        border.width: (rootPlasmoid.pillHudType === "timer_done" || Plasmoid.timerRinging) ? 2 : 1
+        border.color: (rootPlasmoid.pillHudType === "timer_done" || Plasmoid.timerRinging) ? CachyTheme.warningColor : Qt.rgba(1, 1, 1, 0.15)
         clip: true
 
         // Transient Dynamic HUD Row
@@ -88,15 +88,13 @@ Item {
             visible: rootPlasmoid.pillHudType !== ""
             spacing: CachyTheme.spacingSmall
 
-            Kirigami.Icon {
-                implicitWidth: 14
-                implicitHeight: 14
+            CachyIcon {
+                size: 14
                 Layout.preferredWidth: 14
                 Layout.preferredHeight: 14
                 Layout.alignment: Qt.AlignVCenter
-                source: rootPlasmoid.hudIcon
-                isMask: true
-                color: (rootPlasmoid.pillHudType === "timer_done" || rootPlasmoid.pillHudType === "focus")
+                name: rootPlasmoid.hudIcon
+                color: (rootPlasmoid.pillHudType === "timer_done" || Plasmoid.timerRinging || rootPlasmoid.pillHudType === "focus")
                     ? CachyTheme.warningColor
                     : (rootPlasmoid.pillHudType === "volume" ? "#FFFFFF" : CachyTheme.successColor)
             }
@@ -125,7 +123,7 @@ Item {
 
                 PlasmaComponents3.Label {
                     color: "#FFFFFF"
-                    font.pixelSize: Math.min(Kirigami.Theme.smallFont.pixelSize, Math.max(10, pillCapsule.height - 8))
+                    font.pixelSize: Math.min(11, Math.max(10, pillCapsule.height - 8))
                     font.weight: Font.Medium
                     text: rootPlasmoid.hudTitle
                 }
@@ -138,18 +136,26 @@ Item {
 
                 PlasmaComponents3.Label {
                     color: rootPlasmoid.pillHudType === "timer_done" ? CachyTheme.warningColor : "#FFFFFF"
-                    font.pixelSize: Math.min(Kirigami.Theme.smallFont.pixelSize, Math.max(10, pillCapsule.height - 8))
+                    font.pixelSize: Math.min(11, Math.max(10, pillCapsule.height - 8))
                     font.weight: Font.DemiBold
                     text: rootPlasmoid.hudTitle
                     elide: Text.ElideRight
                     Layout.maximumWidth: 180
+                    Layout.alignment: Qt.AlignVCenter
+                    verticalAlignment: Text.AlignVCenter
+                    topPadding: 0
+                    bottomPadding: 0
                 }
 
                 PlasmaComponents3.Label {
                     visible: rootPlasmoid.hudSubtitle.length > 0
                     color: Qt.rgba(1, 1, 1, 0.7)
-                    font.pixelSize: Math.max(9, Kirigami.Theme.smallFont.pixelSize - 2)
+                    font.pixelSize: 9
                     text: "· " + rootPlasmoid.hudSubtitle
+                    Layout.alignment: Qt.AlignVCenter
+                    verticalAlignment: Text.AlignVCenter
+                    topPadding: 0
+                    bottomPadding: 0
                 }
             }
         }
@@ -184,34 +190,45 @@ Item {
                     visible: source.toString().length > 0
                 }
 
-                Kirigami.Icon {
+                CachyIcon {
                     anchors.centerIn: parent
-                    width: Math.max(10, parent.width - 4)
-                    height: Math.max(10, parent.height - 4)
-                    source: (Plasmoid.songRecognizer && (Plasmoid.songRecognizer.listening || Plasmoid.songRecognizer.recognizedActive)) ? "emblem-music-symbolic" : "audio-x-generic"
-                    isMask: true
+                    size: Math.max(10, parent.width - 4)
+                    name: (Plasmoid.songRecognizer && (Plasmoid.songRecognizer.listening || Plasmoid.songRecognizer.recognizedActive)) ? "emblem-music-symbolic" : "audio-x-generic"
                     color: (Plasmoid.songRecognizer && (Plasmoid.songRecognizer.listening || Plasmoid.songRecognizer.recognizedActive)) ? CachyTheme.accentColor : "#FFFFFF"
                     visible: !(Plasmoid.songRecognizer && Plasmoid.songRecognizer.recognizedActive) ? (Plasmoid.trackArtUrl.length === 0 || (Plasmoid.songRecognizer && Plasmoid.songRecognizer.listening)) : (Plasmoid.songRecognizer.coverUrl.length === 0)
                 }
             }
 
+            // Crisp chronometer icon for timer Live Activity
+            CachyIcon {
+                visible: Plasmoid.timerActive || Plasmoid.timerRinging
+                size: 12
+                Layout.preferredWidth: 12
+                Layout.preferredHeight: 12
+                Layout.alignment: Qt.AlignVCenter
+                name: "chronometer"
+                color: CachyTheme.warningColor
+            }
+
             Rectangle {
-                visible: (!(Plasmoid.songRecognizer && (Plasmoid.songRecognizer.listening || Plasmoid.songRecognizer.recognizedActive)) && (!compactPillRoot.cfgShowArt || Plasmoid.trackTitle.length === 0)) || Plasmoid.timerActive
+                visible: (!Plasmoid.timerActive && !Plasmoid.timerRinging) && (!(Plasmoid.songRecognizer && (Plasmoid.songRecognizer.listening || Plasmoid.songRecognizer.recognizedActive)) && (!compactPillRoot.cfgShowArt || Plasmoid.trackTitle.length === 0))
                 implicitWidth: 8
                 implicitHeight: 8
                 Layout.alignment: Qt.AlignVCenter
                 radius: 4
                 color: {
                     if (Plasmoid.kityState === "listening" || Plasmoid.kiriState === "listening") return CachyTheme.accentColor;
-                    if (Plasmoid.timerActive) return CachyTheme.warningColor;
                     return "#FFFFFF";
                 }
             }
 
             PlasmaComponents3.Label {
                 Layout.alignment: Qt.AlignVCenter
-                color: "#FFFFFF"
-                font.pixelSize: Math.min(Kirigami.Theme.smallFont.pixelSize, Math.max(10, pillCapsule.height - 8))
+                verticalAlignment: Text.AlignVCenter
+                topPadding: 0
+                bottomPadding: 0
+                color: (Plasmoid.timerActive || Plasmoid.timerRinging) ? CachyTheme.warningColor : "#FFFFFF"
+                font.pixelSize: Math.min(11, Math.max(10, pillCapsule.height - 8))
                 font.weight: Font.Medium
                 text: {
                     if (Plasmoid.songRecognizer && Plasmoid.songRecognizer.listening) {
@@ -221,8 +238,11 @@ Item {
                         const song = Plasmoid.songRecognizer.title + (Plasmoid.songRecognizer.artist.length > 0 ? " — " + Plasmoid.songRecognizer.artist : "");
                         return song.length > 28 ? song.substring(0, 28) + "…" : song;
                     }
+                    if (Plasmoid.timerRinging) {
+                        return i18n("¡Se acabó el tiempo!");
+                    }
                     if (Plasmoid.timerActive) {
-                        return "⏱  " + Plasmoid.timerRemainingText;
+                        return Plasmoid.timerRemainingText;
                     }
                     if (Plasmoid.trackTitle.length > 0) {
                         const t = Plasmoid.trackTitle;
@@ -238,6 +258,7 @@ Item {
             Row {
                 visible: compactPillRoot.cfgShowWaveform && (Plasmoid.mediaPlaying || Plasmoid.trackTitle.length > 0 || (Plasmoid.songRecognizer && Plasmoid.songRecognizer.listening))
                 spacing: 3
+                height: Math.max(8, pillCapsule.height - 8)
                 Layout.alignment: Qt.AlignVCenter
 
                 Repeater {
@@ -284,6 +305,11 @@ Item {
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             onClicked: {
+                if (Plasmoid.timerRinging) {
+                    Plasmoid.dismissTimer();
+                    rootPlasmoid.pillHudType = "";
+                    return;
+                }
                 if (rootPlasmoid.expanded) {
                     rootPlasmoid.stopAutoCollapse();
                     rootPlasmoid.manualExpanded = false;

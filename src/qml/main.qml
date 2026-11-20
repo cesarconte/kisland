@@ -9,7 +9,6 @@ import QtQuick
 import QtQuick.Controls as QQC2
 import QtQuick.Layouts
 
-import org.kde.kirigami as Kirigami
 import CachyOS.UI
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.plasma.core as PlasmaCore
@@ -38,9 +37,12 @@ PlasmoidItem {
 
     Timer {
         id: pillHudTimer
-        interval: root.pillHudType === "timer_done" ? 5000 : (root.pillHudType === "volume" ? 1800 : 2800)
+        interval: root.pillHudType === "timer_done" ? 6500 : (root.pillHudType === "volume" ? 1800 : 2800)
         repeat: false
         onTriggered: {
+            if (root.pillHudType === "timer_done") {
+                Plasmoid.dismissTimer();
+            }
             root.pillHudType = "";
         }
     }
@@ -170,6 +172,9 @@ PlasmoidItem {
         }
         function onTimerChanged() {
             root.checkTimerChange();
+            if (!Plasmoid.timerRinging && root.pillHudType === "timer_done") {
+                root.pillHudType = "";
+            }
         }
         function onTimerFinished(label, totalSecs) {
             root.showHud("timer_done", i18n("¡Se acabó el tiempo!"), label, "chronometer", 100);
@@ -195,7 +200,7 @@ PlasmoidItem {
     fullRepresentation: Item {
         id: expandedIsland
 
-        readonly property int targetWidth: Math.max(Kirigami.Units.gridUnit * 29, mainColumn.implicitWidth + CachyTheme.spacingLarge * 2)
+        readonly property int targetWidth: Math.max(464, mainColumn.implicitWidth + CachyTheme.spacingLarge * 2)
         readonly property int targetHeight: mainColumn.implicitHeight + CachyTheme.spacingLarge * 2
 
         implicitWidth: targetWidth

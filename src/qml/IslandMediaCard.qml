@@ -8,7 +8,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls as QQC2
 import QtQuick.Layouts
-import org.kde.kirigami as Kirigami
 import CachyOS.UI
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.plasma.plasmoid
@@ -61,12 +60,12 @@ Rectangle {
                     asynchronous: true
                 }
 
-                Kirigami.Icon {
+                CachyIcon {
                     anchors.centerIn: parent
                     visible: !coverArtImg.visible
-                    width: 32
-                    height: 32
-                    source: Plasmoid.isVideoMedia ? "video-x-generic" : "media-optical-audio"
+                    size: 32
+                    name: Plasmoid.isVideoMedia ? "video-x-generic" : "media-optical-audio"
+                    color: CachyPalette.textSecondary
                 }
 
                 MouseArea {
@@ -92,7 +91,7 @@ Rectangle {
                 PlasmaComponents3.Label {
                     Layout.fillWidth: true
                     font.bold: true
-                    font.pointSize: Kirigami.Theme.defaultFont.pointSize + 1
+                    font.pixelSize: 14
                     elide: Text.ElideRight
                     text: Plasmoid.trackTitle.length > 0
                         ? Plasmoid.trackTitle
@@ -102,7 +101,7 @@ Rectangle {
                 PlasmaComponents3.Label {
                     Layout.fillWidth: true
                     opacity: 0.82
-                    font: Kirigami.Theme.smallFont
+                    font.pixelSize: 11
                     elide: Text.ElideRight
                     text: {
                         if (Plasmoid.trackArtist.length > 0 && Plasmoid.trackAlbum.length > 0) {
@@ -151,7 +150,7 @@ Rectangle {
             spacing: CachyTheme.spacingSmall
 
             PlasmaComponents3.Label {
-                font: Kirigami.Theme.smallFont
+                font.pixelSize: 11
                 color: CachyPalette.text
                 opacity: 0.75
                 Layout.minimumWidth: 42
@@ -169,7 +168,7 @@ Rectangle {
             }
 
             PlasmaComponents3.Label {
-                font: Kirigami.Theme.smallFont
+                font.pixelSize: 11
                 color: CachyPalette.text
                 opacity: 0.75
                 Layout.minimumWidth: 48
@@ -201,24 +200,24 @@ Rectangle {
 
             CachyToolbarButton {
                 iconName: "media-skip-backward-symbolic"
-                implicitWidth: Kirigami.Units.gridUnit * 2.0
-                implicitHeight: Kirigami.Units.gridUnit * 2.0
+                implicitWidth: 32
+                implicitHeight: 32
                 enabled: Plasmoid.trackTitle.length > 0
                 onClicked: Plasmoid.previousTrack()
             }
 
             CachyToolbarButton {
                 iconName: Plasmoid.mediaPlaying ? "media-playback-pause-symbolic" : "media-playback-start-symbolic"
-                implicitWidth: Kirigami.Units.gridUnit * 2.3
-                implicitHeight: Kirigami.Units.gridUnit * 2.3
+                implicitWidth: 36
+                implicitHeight: 36
                 enabled: Plasmoid.trackTitle.length > 0
                 onClicked: Plasmoid.playPauseMedia()
             }
 
             CachyToolbarButton {
                 iconName: "media-skip-forward-symbolic"
-                implicitWidth: Kirigami.Units.gridUnit * 2.0
-                implicitHeight: Kirigami.Units.gridUnit * 2.0
+                implicitWidth: 32
+                implicitHeight: 32
                 enabled: Plasmoid.trackTitle.length > 0
                 onClicked: Plasmoid.nextTrack()
             }

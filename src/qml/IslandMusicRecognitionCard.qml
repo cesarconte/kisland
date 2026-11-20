@@ -7,7 +7,6 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Layouts
-import org.kde.kirigami as Kirigami
 import CachyOS.UI
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.plasma.plasmoid
@@ -36,11 +35,9 @@ Rectangle {
             Layout.fillWidth: true
             spacing: CachyTheme.spacingSmall
 
-            Kirigami.Icon {
-                Layout.preferredWidth: 20
-                Layout.preferredHeight: 20
-                source: "emblem-music-symbolic"
-                isMask: true
+            CachyIcon {
+                size: 20
+                name: "emblem-music-symbolic"
                 color: CachyPalette.accentText
             }
 
@@ -93,9 +90,9 @@ Rectangle {
                 anchors.margins: CachyTheme.spacingSmall
                 spacing: CachyTheme.spacingMedium
 
-                PlasmaComponents3.BusyIndicator {
-                    Layout.preferredWidth: 20
-                    Layout.preferredHeight: 20
+                CachyBusyIndicator {
+                    implicitWidth: 20
+                    implicitHeight: 20
                     running: Boolean(Plasmoid.songRecognizer && Plasmoid.songRecognizer.listening)
                 }
 
@@ -142,12 +139,12 @@ Rectangle {
                         fillMode: Image.PreserveAspectCrop
                         asynchronous: true
                     }
-                    Kirigami.Icon {
+                    CachyIcon {
                         anchors.centerIn: parent
-                        width: 24
-                        height: 24
+                        size: 24
                         visible: !Plasmoid.songRecognizer || Plasmoid.songRecognizer.coverUrl.length === 0
-                        source: "emblem-music-symbolic"
+                        name: "emblem-music-symbolic"
+                        color: CachyPalette.textSecondary
                     }
                 }
 
@@ -165,7 +162,7 @@ Rectangle {
                     PlasmaComponents3.Label {
                         Layout.fillWidth: true
                         opacity: 0.82
-                        font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                        font.pixelSize: 11
                         elide: Text.ElideRight
                         text: Plasmoid.songRecognizer ? Plasmoid.songRecognizer.artist : ""
                     }
@@ -206,7 +203,7 @@ Rectangle {
 
             PlasmaComponents3.Label {
                 text: i18n("Historial de canciones reconocidas:")
-                font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                font.pixelSize: 11
                 color: CachyPalette.textMuted
                 font.bold: true
             }
@@ -247,12 +244,12 @@ Rectangle {
                                 asynchronous: true
                             }
 
-                            Kirigami.Icon {
+                            CachyIcon {
                                 anchors.centerIn: parent
-                                width: 16
-                                height: 16
+                                size: 16
                                 visible: !historyItemDelegate.modelData.cover || historyItemDelegate.modelData.cover.length === 0
-                                source: "emblem-music-symbolic"
+                                name: "emblem-music-symbolic"
+                                color: CachyPalette.textSecondary
                             }
                         }
 
@@ -263,7 +260,7 @@ Rectangle {
                             PlasmaComponents3.Label {
                                 Layout.fillWidth: true
                                 text: historyItemDelegate.modelData.title || ""
-                                font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                                font.pixelSize: 11
                                 font.bold: true
                                 elide: Text.ElideRight
                             }
@@ -271,7 +268,7 @@ Rectangle {
                             PlasmaComponents3.Label {
                                 Layout.fillWidth: true
                                 text: (historyItemDelegate.modelData.artist || "") + (historyItemDelegate.modelData.timestamp ? " · " + historyItemDelegate.modelData.timestamp : "")
-                                font.pixelSize: Kirigami.Theme.smallFont.pixelSize - 1
+                                font.pixelSize: 10
                                 color: CachyPalette.textMuted
                                 elide: Text.ElideRight
                             }
@@ -310,7 +307,7 @@ Rectangle {
                 ? Plasmoid.songRecognizer.status
                 : i18n("Pulsa «Reconocer canción» para identificar cualquier música que suene en tu equipo.")
             color: CachyPalette.textMuted
-            font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+            font.pixelSize: 11
             wrapMode: Text.WordWrap
         }
     }

@@ -4,6 +4,7 @@
 */
 
 #include "songrecognizer.h"
+#include "timermanager.h"
 
 #include <algorithm>
 #include <cmath>
@@ -46,6 +47,33 @@ private Q_SLOTS:
         QCOMPARE(fmt(65), QStringLiteral("01:05"));
         QCOMPARE(fmt(1500), QStringLiteral("25:00"));
         QCOMPARE(fmt(3665), QStringLiteral("01:01:05"));
+    }
+
+    void testTimerManagerLifecycle()
+    {
+        TimerManager tm;
+        QCOMPARE(tm.isActive(), false);
+        QCOMPARE(tm.isPaused(), false);
+        QCOMPARE(tm.isRinging(), false);
+        QCOMPARE(tm.progress(), 0.0);
+
+        tm.startQuickTimer(10, QStringLiteral("TestTimer"));
+        QCOMPARE(tm.isActive(), true);
+        QCOMPARE(tm.isPaused(), false);
+        QCOMPARE(tm.isRinging(), false);
+        QCOMPARE(tm.label(), QStringLiteral("TestTimer"));
+        QVERIFY(tm.progress() >= 0.0 && tm.progress() <= 1.0);
+
+        tm.togglePauseTimer();
+        QCOMPARE(tm.isPaused(), true);
+
+        tm.togglePauseTimer();
+        QCOMPARE(tm.isPaused(), false);
+
+        tm.dismissTimer();
+        QCOMPARE(tm.isActive(), false);
+        QCOMPARE(tm.isPaused(), false);
+        QCOMPARE(tm.isRinging(), false);
     }
 
     void testSpectrumBarComputation()

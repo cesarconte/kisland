@@ -37,6 +37,7 @@ class KIslandApplet : public Plasma::Applet
     Q_PROPERTY(QVariantList spectrumBars READ spectrumBars NOTIFY spectrumChanged)
     Q_PROPERTY(bool timerActive READ timerActive NOTIFY timerChanged)
     Q_PROPERTY(bool timerPaused READ timerPaused NOTIFY timerChanged)
+    Q_PROPERTY(bool timerRinging READ timerRinging NOTIFY timerChanged)
     Q_PROPERTY(double timerProgress READ timerProgress NOTIFY timerChanged)
     Q_PROPERTY(QString timerRemainingText READ timerRemainingText NOTIFY timerChanged)
     Q_PROPERTY(QString timerLabel READ timerLabel NOTIFY timerChanged)
@@ -80,6 +81,7 @@ public:
     QVariantList spectrumBars() const;
     bool timerActive() const;
     bool timerPaused() const;
+    bool timerRinging() const;
     double timerProgress() const;
     QString timerRemainingText() const;
     QString timerLabel() const;
@@ -112,6 +114,7 @@ public:
     Q_INVOKABLE void startQuickTimer(int durationSeconds, const QString &label = QStringLiteral("Temporizador"));
     Q_INVOKABLE void togglePauseTimer();
     Q_INVOKABLE void cancelQuickTimer();
+    Q_INVOKABLE void dismissTimer();
     Q_INVOKABLE void invokeKity();
     Q_INVOKABLE void invokeKiriVoice();
     Q_INVOKABLE void setOutputVolume(int percent);

@@ -8,7 +8,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls as QQC2
 import QtQuick.Layouts
-import org.kde.kirigami as Kirigami
 import CachyOS.UI
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.plasma.plasmoid
@@ -29,7 +28,7 @@ ColumnLayout {
 
         CachyHeading {
             level: 4
-            text: i18n("🏝️ KIsland")
+            text: i18n("KIsland")
         }
 
         Rectangle {
@@ -45,7 +44,7 @@ ColumnLayout {
             PlasmaComponents3.Label {
                 id: vitalsLbl
                 anchors.centerIn: parent
-                font: Kirigami.Theme.smallFont
+                font.pixelSize: 11
                 color: CachyPalette.text
                 opacity: 0.85
                 text: "CPU " + Plasmoid.cpuUsagePercent + "% · RAM " + Plasmoid.ramUsagePercent + "%"
@@ -69,16 +68,14 @@ ColumnLayout {
                 anchors.centerIn: parent
                 spacing: 4
 
-                Kirigami.Icon {
-                    implicitWidth: 13
-                    implicitHeight: 13
-                    source: Plasmoid.focusModeIcon.length > 0 ? Plasmoid.focusModeIcon : (Plasmoid.focusDndActive ? "notifications-disabled" : "preferences-desktop-notification-bell")
-                    isMask: true
+                CachyIcon {
+                    size: 13
+                    name: Plasmoid.focusModeIcon.length > 0 ? Plasmoid.focusModeIcon : (Plasmoid.focusDndActive ? "notifications-disabled" : "preferences-desktop-notification-bell")
                     color: (Plasmoid.focusDndActive || Plasmoid.focusActive) ? CachyTheme.warningColor : CachyPalette.text
                 }
 
                 PlasmaComponents3.Label {
-                    font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                    font.pixelSize: 11
                     font.weight: Font.Medium
                     color: (Plasmoid.focusDndActive || Plasmoid.focusActive) ? CachyTheme.warningColor : CachyPalette.text
                     text: {
@@ -117,7 +114,7 @@ ColumnLayout {
             PlasmaComponents3.Label {
                 id: privLbl
                 anchors.centerIn: parent
-                font: Kirigami.Theme.smallFont
+                font.pixelSize: 11
                 color: CachyPalette.textSecondary
                 text: {
                     const parts = [];
@@ -161,24 +158,24 @@ ColumnLayout {
     }
 
     // Tabs Switcher
-    RowLayout {
+    CachySegmentedControl {
+        id: tabSegment
         Layout.fillWidth: true
-        spacing: CachyTheme.spacingSmall
-
-        CachyButton {
-            text: i18n("🎵 Multimedia")
-            flat: rootPlasmoid.currentTab !== 0
-            primary: rootPlasmoid.currentTab === 0
-            onClicked: rootPlasmoid.currentTab = 0
+        model: [
+            i18n("Multimedia"),
+            headerRoot.shelfModel.count > 0 ? i18n("Bandeja (%1)", headerRoot.shelfModel.count) : i18n("Bandeja")
+        ]
+        currentIndex: rootPlasmoid.currentTab
+        onCurrentIndexChanged: {
+            if (rootPlasmoid.currentTab !== currentIndex) {
+                rootPlasmoid.currentTab = currentIndex;
+            }
         }
-
-        CachyButton {
-            text: headerRoot.shelfModel.count > 0 ? i18n("📁 Bandeja (%1)", headerRoot.shelfModel.count) : i18n("📁 Bandeja")
-            flat: rootPlasmoid.currentTab !== 1
-            primary: rootPlasmoid.currentTab === 1
-            onClicked: rootPlasmoid.currentTab = 1
+        Connections {
+            target: rootPlasmoid
+            function onCurrentTabChanged() {
+                tabSegment.currentIndex = rootPlasmoid.currentTab;
+            }
         }
-
-        Item { Layout.fillWidth: true }
     }
 }

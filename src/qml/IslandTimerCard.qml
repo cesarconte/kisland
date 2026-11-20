@@ -7,7 +7,6 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Layouts
-import org.kde.kirigami as Kirigami
 import CachyOS.UI
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.plasma.plasmoid
@@ -21,7 +20,7 @@ Rectangle {
     radius: CachyTheme.radiusSmall
     color: CachyPalette.cardBackground
     border.width: 1
-    border.color: Plasmoid.timerActive ? CachyTheme.accentColor : CachyPalette.specularBorder
+    border.color: Plasmoid.timerRinging ? CachyTheme.warningColor : (Plasmoid.timerActive ? CachyTheme.accentColor : CachyPalette.specularBorder)
 
     ColumnLayout {
         id: timerCol
@@ -35,23 +34,40 @@ Rectangle {
             Layout.fillWidth: true
             spacing: CachyTheme.spacingSmall
 
+            CachyIcon {
+                size: 16
+                name: "chronometer"
+                color: Plasmoid.timerRinging ? CachyTheme.warningColor : CachyPalette.text
+            }
+
             PlasmaComponents3.Label {
                 Layout.fillWidth: true
                 font.bold: true
-                text: Plasmoid.timerActive
-                    ? i18n("⏱  %1: %2", Plasmoid.timerLabel, Plasmoid.timerRemainingText)
-                    : i18n("⏱  Temporizadores Rápidos (Live Activity)")
+                text: Plasmoid.timerRinging
+                    ? i18n("¡Se acabó el tiempo! (%1)", Plasmoid.timerLabel)
+                    : (Plasmoid.timerActive
+                        ? i18n("%1: %2", Plasmoid.timerLabel, Plasmoid.timerRemainingText)
+                        : i18n("Temporizadores Rápidos (Live Activity)"))
+                color: Plasmoid.timerRinging ? CachyTheme.warningColor : CachyPalette.text
             }
 
             CachyButton {
-                visible: Plasmoid.timerActive
+                visible: Plasmoid.timerRinging
+                iconName: "dialog-ok-symbolic"
+                text: i18n("Descartar")
+                primary: true
+                onClicked: Plasmoid.dismissTimer()
+            }
+
+            CachyButton {
+                visible: Plasmoid.timerActive && !Plasmoid.timerRinging
                 iconName: Plasmoid.timerPaused ? "media-playback-start-symbolic" : "media-playback-pause-symbolic"
                 text: Plasmoid.timerPaused ? i18n("Reanudar") : i18n("Pausar")
                 onClicked: Plasmoid.togglePauseTimer()
             }
 
             CachyButton {
-                visible: Plasmoid.timerActive
+                visible: Plasmoid.timerActive && !Plasmoid.timerRinging
                 iconName: "process-stop-symbolic"
                 text: i18n("Cancelar")
                 onClicked: Plasmoid.cancelQuickTimer()
@@ -59,7 +75,7 @@ Rectangle {
         }
 
         // Visual countdown bar when timer is active
-        PlasmaComponents3.ProgressBar {
+        CachyProgressBar {
             Layout.fillWidth: true
             visible: Plasmoid.timerActive
             from: 0.0
@@ -77,13 +93,13 @@ Rectangle {
                     { secs: 60, label: "1 min" },
                     { secs: 300, label: "5 min" },
                     { secs: 600, label: "10 min" },
-                    { secs: 1500, label: "🍅 Pomodoro (25m)" }
+                    { secs: 1500, label: "Pomodoro (25m)" }
                 ]
                 CachyButton {
                     required property var modelData
                     Layout.fillWidth: true
                     text: modelData.label
-                    font: Kirigami.Theme.smallFont
+                    font.pixelSize: 11
                     onClicked: Plasmoid.startQuickTimer(modelData.secs, modelData.label)
                 }
             }
@@ -95,37 +111,31 @@ Rectangle {
             visible: !Plasmoid.timerActive
             spacing: CachyTheme.spacingSmall
 
-            PlasmaComponents3.SpinBox {
+            CachySpinBox {
                 id: customHoursSpin
                 Layout.fillWidth: true
                 from: 0
                 to: 23
                 value: 0
-                editable: true
-                textFromValue: function(value) { return value + " h"; }
-                valueFromText: function(text) { return parseInt(text) || 0; }
+                suffix: " h"
             }
 
-            PlasmaComponents3.SpinBox {
+            CachySpinBox {
                 id: customMinsSpin
                 Layout.fillWidth: true
                 from: 0
                 to: 59
                 value: 15
-                editable: true
-                textFromValue: function(value) { return value + " min"; }
-                valueFromText: function(text) { return parseInt(text) || 0; }
+                suffix: " min"
             }
 
-            PlasmaComponents3.SpinBox {
+            CachySpinBox {
                 id: customSecsSpin
                 Layout.fillWidth: true
                 from: 0
                 to: 59
                 value: 0
-                editable: true
-                textFromValue: function(value) { return value + " s"; }
-                valueFromText: function(text) { return parseInt(text) || 0; }
+                suffix: " s"
             }
         }
 
@@ -135,11 +145,10 @@ Rectangle {
             visible: !Plasmoid.timerActive
             spacing: CachyTheme.spacingSmall
 
-            PlasmaComponents3.TextField {
+            CachyTextField {
                 id: customLabelField
                 Layout.fillWidth: true
                 placeholderText: i18n("Etiqueta (opcional)")
-                clearButtonShown: true
                 onAccepted: startCustomTimerBtn.clicked()
             }
 
